@@ -117,8 +117,9 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 n_classes,
                 bert,
                 max_length=20,
-                device=None):
-        super().__init__()
+                device=None,
+                debug=False):
+        super().__init__(debug=debug)
         self.n_classes = n_classes
         self.bert = bert
         self.bert.train()
