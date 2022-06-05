@@ -762,5 +762,5 @@ class BERTLIMTrainer(LIMTrainer):
         base_y = [class2index[label] for label in base_y]
         base_y = torch.tensor(base_y)
 
-        dataset = torch.utils.data.TensorDataset(base_x[0],base_x[1] base_y)
+        dataset = torch.utils.data.TensorDataset(base_x[0],base_x[1], base_y)
         return dataset
