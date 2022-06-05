@@ -130,7 +130,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         self.model_dims = [n]
         self.model_layers = torch.nn.ModuleList()
         for layer in self.bert.encoder.layer:
-            self.model_layers.append(LIMBertLayer(layer, len(self.bert.encoder.layer)-1))
+            self.model_layers.append(LIMBertLayer(bert, layer, len(self.bert.encoder.layer)-1))
             self.model_dims.append(n)
         self.classifier_layer = torch.nn.Linear(self.hidden_dim, self.n_classes)
 
