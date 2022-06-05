@@ -750,7 +750,7 @@ class BERTLIMTrainer(LIMTrainer):
 
     def build_dataset(self, base_x, base_y):
 
-        base_y = torch.tensor(base_y)
+        base_y = torch.tensor(base_y).reshape((-1,1))
 
         dataset = torch.utils.data.TensorDataset(base_x[0],base_x[1], base_y)
         return dataset
