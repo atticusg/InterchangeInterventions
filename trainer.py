@@ -751,12 +751,12 @@ class BERTLIMTrainer(LIMTrainer):
     def build_dataset(self, base_x, base_y):
 
         base_y = torch.tensor(base_y).reshape((-1,1))
+        input, mask = base_x
+        input = torch.tensor(input)
+        mask = torch.tensor(mask)
 
-        print(base_x[0])
-        print(base_x[1])
-        print(base_y)
-        
-        dataset = torch.utils.data.TensorDataset(base_x[0],base_x[1], base_y)
+
+        dataset = torch.utils.data.TensorDataset(input, mask, base_y)
         return dataset
 
     def process_batch(self,batch):
