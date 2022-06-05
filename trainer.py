@@ -9,7 +9,6 @@ import utils
 __author__ = "Christopher Potts"
 __version__ = "CS224u, Stanford, Spring 2022"
 
-
 class LIMTrainer:
     def __init__(self,
             LIM,
@@ -711,3 +710,51 @@ class LIMTrainer:
         param_str = ["{}={}".format(a, getattr(self, a)) for a in self.params]
         param_str = ",\n\t".join(param_str)
         return "{}(\n\t{})".format(self.__class__.__name__, param_str)
+
+
+
+
+class BERTLIMTrainer(LIMTrainer):
+    def __init__(self, bert, **kwargs):
+        super().__init__(bert, **kwargs)
+
+    def build_iit_dataset(self, base, base_y, iit_data):
+        sources, IIT_y, intervention_ids = iit_data
+        base = torch.FloatTensor(np.array(base))
+        sources = [torch.FloatTensor(np.array(source)) for source in sources]
+        sources = torch.reshape(
+            torch.stack(sources, dim=1),
+            (-1, len(sources),
+            sources[0].shape[1]))
+
+        intervention_ids = torch.FloatTensor(np.array(intervention_ids))
+
+        base_y = np.array(base_y)
+        self.classes_ = sorted(set(base_y))
+        self.n_classes_ = len(self.classes_)
+        class2index = dict(zip(self.classes_, range(self.n_classes_)))
+        base_y = [class2index[label] for label in base_y]
+        base_y = torch.tensor(base_y)
+
+        IIT_y = np.array(IIT_y)
+        IIT_y = [class2index[int(label)] for label in IIT_y]
+        IIT_y = torch.tensor(IIT_y)
+
+        dataset = torch.utils.data.TensorDataset(
+            base, base_y, sources, IIT_y, intervention_ids)
+        return dataset
+
+    def build_dataset(self, base_x, base_y):
+        base_x_indices = torch.FloatTensor(np.array(base_x[0]))
+        base_x_mask = torch.FloatTensor(np.array(base_x[1]))
+        base_x = (base_x_indices, base_x_mask)
+
+        base_y = np.array(base_y)
+        self.classes_ = sorted(set(base_y))
+        self.n_classes_ = len(self.classes_)
+        class2index = dict(zip(self.classes_, range(self.n_classes_)))
+        base_y = [class2index[label] for label in base_y]
+        base_y = torch.tensor(base_y)
+
+        dataset = torch.utils.data.TensorDataset(base_x, base_y)
+        return dataset

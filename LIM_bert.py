@@ -135,6 +135,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         def unwrap(X):
             output = X[0]
             original_shape = copy.deepcopy(output.shape())
+            output = torch.reshape(output, (original_shape[0], -1))
             rest = X[1:]
             return output, (rest, original_shape)
 
@@ -142,9 +143,9 @@ class LIMBERTClassifier(LayeredIntervenableModel):
             rest, original_shape = stow
             return X[0].reshape(original_shape), *rest
 
-        print("hello")
 
         self.build_graph(self.model_layers, self.model_dims, unwrap, rewrap)
+
 
     def forward(self, X, mask):
         """Computes a forward pass with input `X`."""

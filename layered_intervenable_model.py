@@ -82,6 +82,7 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.analysis_model.extend([model_layer, lin_layer, inverse_lin_layer])
             self.labeled_layers.append({"disentangle":lin_layer, "reentangle":inverse_lin_layer, "model":model_layer})
 
+
         self.labeled_layers.append({"model":model_layers[-1]})
         self.normal_model.extend([model_layers[-1]])
         self.analysis_model.extend([model_layers[-1]])
