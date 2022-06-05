@@ -6,12 +6,11 @@ import numpy as np
 import torch
 
 def get_IIT_MoNLI_dataset(embed_func, suffix, size):
-    train_dataset = IIT_MoNLIDataset(
+    dataset = IIT_MoNLIDataset(
         embed_func=embed_func,
         suffix=suffix,
         size=size)
-    X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
-    return X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions
+    return dataset.create()
 
 class IIT_MoNLIDataset:
 
