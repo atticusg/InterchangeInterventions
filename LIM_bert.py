@@ -153,9 +153,9 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         """Computes a forward pass with input `X`."""
         X, mask = pair
         if self.analysis:
-            self.bert.encoder = self.analysis_model(X)
+            self.bert.encoder = self.analysis_model
         else:
-            self.bert.encoder =  self.normal_model(X)
+            self.bert.encoder =  self.normal_model
         output = self.bert(input_ids=X, attention_mask=mask).pooler_output
         output = self.classifier_layer(output)
         return output
