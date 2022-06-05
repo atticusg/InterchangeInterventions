@@ -75,7 +75,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         for index, model_layer in enumerate(model_layers[:-1]):
             self.normal_model.append(model_layer)
             self.analysis_model.extend([model_layer])
-            if self.debug:
+            if not self.debug:
                 lin_layer = LinearLayer(model_layer_dims[index+1],
                                         self.device,
                                         unwrap=unwrap,
