@@ -31,7 +31,7 @@ class LinearLayer(torch.nn.Module):
         return torch.matmul(x, self.weight)
 
 class LayeredIntervenableModel(torch.nn.Module):
-    def __init__(self, device=None):
+    def __init__(self, device=None,debug=False):
         """
 
         Base class for all the PyTorch-based models.
@@ -72,15 +72,17 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.labeled_layers = []
         # Initialize the orthogonal transformations used for disentanglement
         for index, model_layer in enumerate(model_layers[:-1]):
-            lin_layer = LinearLayer(model_layer_dims[index+1],
-                                    self.device,
-                                    unwrap=unwrap,
-                                    rewrap=rewrap)
-            lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
-            inverse_lin_layer = InverseLinearLayer(lin_layer)
             self.normal_model.append(model_layer)
-            self.analysis_model.extend([model_layer, lin_layer, inverse_lin_layer])
-            self.labeled_layers.append({"disentangle":lin_layer, "reentangle":inverse_lin_layer, "model":model_layer})
+            self.analysis_model.extend([model_layer])
+            if debug:
+                lin_layer = LinearLayer(model_layer_dims[index+1],
+                                        self.device,
+                                        unwrap=unwrap,
+                                        rewrap=rewrap)
+                lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
+                inverse_lin_layer = InverseLinearLayer(lin_layer)
+                self.analysis_model.extend([lin_layer, inverse_lin_layer])
+                self.labeled_layers.append({"disentangle":lin_layer, "reentangle":inverse_lin_layer, "model":model_layer})
 
 
         self.labeled_layers.append({"model":model_layers[-1]})
