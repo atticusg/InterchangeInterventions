@@ -745,11 +745,8 @@ class BERTLIMTrainer(LIMTrainer):
         return dataset
 
     def build_dataset(self, base_x, base_y):
-        base_x_indices = torch.FloatTensor(np.array(base_x[0]))
-        base_x_mask = torch.FloatTensor(np.array(base_x[1]))
-        base_x = (base_x_indices, base_x_mask)
 
-        base_y = np.array(base_y)
+        base_y = np.array(list(base_y))
         self.classes_ = sorted(set(base_y))
         self.n_classes_ = len(self.classes_)
         class2index = dict(zip(self.classes_, range(self.n_classes_)))
