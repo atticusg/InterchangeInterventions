@@ -23,7 +23,7 @@ class LIMBertLayer(torch.nn.Module):
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
-        all_cross_attentions = () if output_attentions and self.config.add_cross_attention else None
+        all_cross_attentions = () if output_attentions and self.layer.config.add_cross_attention else None
 
         next_decoder_cache = () if use_cache else None
         if output_hidden_states:
@@ -31,8 +31,8 @@ class LIMBertLayer(torch.nn.Module):
 
         layer_head_mask = head_mask[layer_num] if head_mask is not None else None
         past_key_value = past_key_values[layer_num] if past_key_values is not None else None
-
-        if getattr(self.config, "gradient_checkpointing", False) and self.training:
+        #PUSHTHIS TO GIT
+        if getattr(self.layer.config, "gradient_checkpointing", False) and self.layer.training:
 
             if use_cache:
                 logger.warning(
@@ -71,7 +71,7 @@ class LIMBertLayer(torch.nn.Module):
                 next_decoder_cache += (layer_outputs[-1],)
             if output_attentions:
                 all_self_attentions = all_self_attentions + (layer_outputs[1],)
-                if self.config.add_cross_attention:
+                if self.layer.config.add_cross_attention:
                     all_cross_attentions = all_cross_attentions + (layer_outputs[2],)
 
         if output_hidden_states:
