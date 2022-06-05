@@ -98,7 +98,7 @@ class IIT_MoNLIDataset:
         random.shuffle(pmonli)
         random.shuffle(nmonli)
 
-        base, source, y, IIT_y, interventions = zip(*data)
+        base, y, source, IIT_y, interventions = zip(*data)
         self.base = base
         self.source = source
         self.y = np.array(y)
