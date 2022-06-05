@@ -752,8 +752,8 @@ class BERTLIMTrainer(LIMTrainer):
 
         base_y = torch.tensor(base_y).reshape((-1,1))
         input, mask = base_x
-        input = torch.tensor(input)
-        mask = torch.tensor(mask)
+        input = torch.stack(input)
+        mask = torch.stack(mask)
 
 
         dataset = torch.utils.data.TensorDataset(input, mask, base_y)
