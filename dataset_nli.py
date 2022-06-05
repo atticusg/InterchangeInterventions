@@ -107,4 +107,4 @@ class IIT_MoNLIDataset:
         self.interventions = np.array(interventions)
         self.sources = list()
         self.sources.append((self.source,self.source_mask))
-        return self.base, self.base_mask, self.y, self.sources, self.IIT_y, self.interventions
+        return (self.base, self.base_mask), self.y, self.sources, self.IIT_y, self.interventions
