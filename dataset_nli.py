@@ -98,10 +98,10 @@ class IIT_MoNLIDataset:
         random.shuffle(nmonli)
 
         base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
-        self.base = np.array(base)
-        self.base_mask = np.array(base_mask)
-        self.source = np.array(source)
-        self.source_mask = np.array(source_mask)
+        self.base = base
+        self.base_mask = base_mask
+        self.source = source
+        self.source_mask = source_mask
         self.y = np.array(y)
         self.IIT_y = np.array(IIT_y)
         self.interventions = np.array(interventions)
