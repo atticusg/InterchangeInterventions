@@ -332,14 +332,23 @@ class LIMTrainer:
             for batch_num, batch in enumerate(dataloader, start=1):
 
                 batch = [x.to(self.device, non_blocking=True) for x in batch]
-                base_batch = batch[0]
-                base_labels_batch = batch[1]
+                if self.dual_input:
+                    base_batch = batch[0:2]
+                    base_labels_batch = batch[2]
+                else:
+                    base_batch = batch[0]
+                    base_labels_batch = batch[1]
                 batch_preds = self.model(base_batch)
                 err = self.loss(batch_preds, base_labels_batch)
                 if iit_data is not None:
-                    sources_batch = batch[2]
-                    iit_labels_batch = batch[3]
-                    intervention_ids_batch = batch[4]
+                    if self.dual_input:
+                        sources_batch = batch[3]
+                        iit_labels_batch = batch[4]
+                        intervention_ids_batch = batch[5]
+                    else:
+                        sources_batch = batch[2]
+                        iit_labels_batch = batch[3]
+                        intervention_ids_batch = batch[4]
                     batch_iit_preds = self.model.iit_forward(
                                     base_batch,
                                     sources_batch,
@@ -753,5 +762,5 @@ class BERTLIMTrainer(LIMTrainer):
         base_y = [class2index[label] for label in base_y]
         base_y = torch.tensor(base_y)
 
-        dataset = torch.utils.data.TensorDataset(base_x, base_y)
+        dataset = torch.utils.data.TensorDataset(base_x[0],base_x[1] base_y)
         return dataset

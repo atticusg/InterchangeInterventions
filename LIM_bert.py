@@ -148,8 +148,9 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         self.build_graph(self.model_layers, self.model_dims, unwrap, rewrap)
 
 
-    def forward(self, X, mask):
+    def forward(self, pair):
         """Computes a forward pass with input `X`."""
+        X, mask = pair
         if self.analysis:
             self.bert.encoder = self.analysis_model(X)
         else:
