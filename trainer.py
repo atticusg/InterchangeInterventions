@@ -752,6 +752,10 @@ class BERTLIMTrainer(LIMTrainer):
 
         base_y = torch.tensor(base_y).reshape((-1,1))
 
+        print(base_x[0])
+        print(base_x[1])
+        print(base_y)
+        
         dataset = torch.utils.data.TensorDataset(base_x[0],base_x[1], base_y)
         return dataset
 
