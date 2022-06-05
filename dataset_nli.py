@@ -40,13 +40,13 @@ class IIT_MoNLIDataset:
 
         for example in copy.deepcopy(nmonli):
             for example2 in copy.deepcopy(nmonli):
-                base = self.embed_func([example["sentence1"], example["sentence2"]])
-                source = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
                 intervention = self.LEXVAR
 
                 base_label = self.NEUTRAL_LABEL
                 IIT_label = self.NEUTRAL_LABEL
-                data.append((base, base_label, source, IIT_label, intervention))
+                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
                 if len(data) > int(self.size/4):
                     break
 
@@ -55,13 +55,13 @@ class IIT_MoNLIDataset:
 
         for example in copy.deepcopy(pmonli):
             for example2 in copy.deepcopy(nmonli):
-                base = self.embed_func([example["sentence1"], example["sentence2"]])
-                source = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
                 intervention = self.LEXVAR
 
                 base_label = self.ENTAIL_LABEL
                 IIT_label = self.NEUTRAL_LABEL
-                data.append((base, base_label, source, IIT_label, intervention))
+                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
                 if len(data) > int((self.size*2)/4):
                     break
 
@@ -70,13 +70,13 @@ class IIT_MoNLIDataset:
 
         for example in copy.deepcopy(nmonli):
             for example2 in copy.deepcopy(pmonli):
-                base = self.embed_func([example["sentence1"], example["sentence2"]])
-                source = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
                 intervention = self.LEXVAR
 
                 base_label = self.NEUTRAL_LABEL
                 IIT_label = self.ENTAIL_LABEL
-                data.append((base, base_label, source, IIT_label, intervention))
+                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
                 if len(data) > int((self.size*3)/4):
                     break
 
@@ -85,25 +85,27 @@ class IIT_MoNLIDataset:
 
         for example2 in copy.deepcopy(pmonli):
             for example2 in copy.deepcopy(pmonli):
-                base = self.embed_func([example["sentence1"], example["sentence2"]])
-                source = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
                 intervention = self.LEXVAR
 
                 base_label = self.ENTAIL_LABEL
                 IIT_label = self.ENTAIL_LABEL
-                data.append((base, base_label, source, IIT_label, intervention))
+                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
                 if len(data) > int(self.size):
                     break
 
         random.shuffle(pmonli)
         random.shuffle(nmonli)
 
-        base, y, source, IIT_y, interventions = zip(*data)
-        self.base = base
-        self.source = source
+        base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
+        self.base = np.array(base)
+        self.base_mask = np.array(base_mask)
+        self.source = np.array(source)
+        self.source_mask = np.array(source_mask)
         self.y = np.array(y)
         self.IIT_y = np.array(IIT_y)
         self.interventions = np.array(interventions)
         self.sources = list()
-        self.sources.append(self.source)
-        return self.base, self.y, self.sources, self.IIT_y, self.interventions
+        self.sources.append((self.source,self.source_mask))
+        return self.base, self.base_mask, self.y, self.sources, self.IIT_y, self.interventions
