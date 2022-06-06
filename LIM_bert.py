@@ -107,7 +107,7 @@ class LIMBertLayer(torch.nn.Module):
                         cross_attentions=all_cross_attentions,
                     )
 
-        return (hidden_states,
+        return *(hidden_states,
                 layer_num + 1,
                 final_layer_num,
                 attention_mask,
