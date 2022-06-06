@@ -749,6 +749,51 @@ class BERTLIMTrainer(LIMTrainer):
             base, base_y, sources, IIT_y, intervention_ids)
         return dataset
 
+    def predict(self, X_base, device=None):
+        """
+        Internal method that subclasses are expected to use to define
+        their own `predict` functions. The hope is that this method
+        can do all the data organization and other details, allowing
+        subclasses to have compact predict methods that just encode
+        the core logic specific to them.
+
+        Parameters
+        ----------
+        *args: system inputs
+
+        device: str or None
+            Allows the user to temporarily change the device used
+            during prediction. This is useful if predictions require a
+            lot of memory and so are better done on the CPU. After
+            prediction is done, the model is returned to `self.device`.
+
+        Returns
+        -------
+        The precise return value depends on the nature of the predictions.
+        If the predictions have the same shape across all batches, then
+        we return a single tensor concatenation of them. If the shape
+        can vary across batches, as is common for sequence prediction,
+        then we return a list of tensors of varying length.
+
+        """
+        device = self.device if device is None else torch.device(device)
+
+        # Dataset:
+        input, mask = X_base
+        input = input.float().to(device)
+        mask = mask.float().to(device)
+
+        # Model:
+        self.model.to(device)
+        self.model.eval()
+
+        with torch.no_grad():
+            preds = self.model((input, mask))
+
+        # Make sure the model is back on the instance device:
+        self.model.to(self.device)
+        return preds.argmax(axis=1)
+
     def build_dataset(self, base_x, base_y):
 
         base_y = torch.tensor(base_y).reshape((-1,1))

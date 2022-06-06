@@ -12,6 +12,57 @@ def get_IIT_MoNLI_dataset(embed_func, suffix, size):
         size=size)
     return dataset.create()
 
+class NMoNLIDataset:
+    ENTAIL_LABEL = 0
+    NEUTRAL_LABEL = 1
+    CONTRADICTION_LABEL = 2
+
+    def __init__(self, embed_func, suffix):
+        self.embed_func = embed_func
+        self.suffix = suffix
+        self.size = size
+
+    def create(self):
+        nmonli = []
+        with open(os.path.join(f"datasets", f"nmonli_{self.suffix}.jsonl")) as f:
+            for line in f.readlines():
+                example =json.loads(line)
+                intervention = self.LEXVAR
+                base_label = self.NEUTRAL_LABEL
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                nmonli.append((base, base_mask, base_label))
+
+        base, base_mask, y = zip(*nmonli)
+        self.base = base
+        self.base_mask = base_mask
+        self.y = np.array(y)
+        return self.base, self.base_mask, self.y
+
+class PMoNLIDataset:
+    ENTAIL_LABEL = 0
+    NEUTRAL_LABEL = 1
+    CONTRADICTION_LABEL = 2
+
+    def __init__(self, embed_func):
+        self.embed_func = embed_func
+
+    def create(self):
+        pmonli = []
+        with open(os.path.join(f"datasets", f"pmonli.jsonl")) as f:
+            for line in f.readlines():
+                example =json.loads(line)
+                intervention = self.LEXVAR
+                base_label = self.NEUTRAL_LABEL
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                pmonli.append((base, base_mask, base_label))
+
+        base, base_mask, y = zip(*pmonli)
+        self.base = base
+        self.base_mask = base_mask
+        self.y = np.array(y)
+        return self.base, self.base_mask, self.y
+
+
 class IIT_MoNLIDataset:
 
     LEXVAR = 0
