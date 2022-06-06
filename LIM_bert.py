@@ -86,7 +86,7 @@ class LIMBertLayer(torch.nn.Module):
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
 
-        if layer_num == final_layer_num:
+        if layer_num == self.final_layer_num:
             if not return_dict:
                 return tuple(
                     v
@@ -107,18 +107,17 @@ class LIMBertLayer(torch.nn.Module):
                         cross_attentions=all_cross_attentions,
                     )
 
-        return *(hidden_states,
-                layer_num + 1,
-                final_layer_num,
-                attention_mask,
-                head_mask,
-                encoder_hidden_states,
-                encoder_attention_mask,
-                past_key_values,
-                use_cache,
-                output_attentions,
-                output_hidden_states,
-                return_dict)
+        return hidden_states, \
+                layer_num + 1, \
+                attention_mask, \
+                head_mask, \
+                encoder_hidden_states, \
+                encoder_attention_mask, \
+                past_key_values, \
+                use_cache, \
+                output_attentions, \
+                output_hidden_states, \
+                return_dict
 
 
 class LIMBERTClassifier(LayeredIntervenableModel):
