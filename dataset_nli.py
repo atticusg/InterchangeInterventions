@@ -30,7 +30,6 @@ class NMoNLIDataset:
     def __init__(self, embed_func, suffix):
         self.embed_func = embed_func
         self.suffix = suffix
-        self.size = size
 
     def create(self):
         nmonli = []
