@@ -18,7 +18,7 @@ class SequentialLayers(torch.nn.Module):
                 output_attentions=False,
                 output_hidden_states=False,
                 return_dict=True):
-                
+
         args = (hidden_states,
                 layer_num,
                 attention_mask,
@@ -43,7 +43,6 @@ class LIMBertLayer(torch.nn.Module):
         self.bert = bert
         self.layer = layer
         self.final_layer_num = final_layer_num
-        self.combiner = SequentialLayers
 
     def forward(self,
                 hidden_states,
@@ -156,6 +155,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 device=None,
                 debug=False):
         super().__init__(debug=debug)
+        self.combiner = SequentialLayers
         self.n_classes = n_classes
         self.bert = bert
         self.bert.train()
