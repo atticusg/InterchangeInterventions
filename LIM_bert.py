@@ -6,7 +6,30 @@ class SequentialLayers(torch.nn.Module):
         super().__init__()
         self.layers = layers
 
-    def forward(self, *args):
+    def forward(self,
+                hidden_states,
+                layer_num=0,
+                attention_mask=None,
+                head_mask=None,
+                encoder_hidden_states=None,
+                encoder_attention_mask=None,
+                past_key_values=None,
+                use_cache=None,
+                output_attentions=False,
+                output_hidden_states=False,
+                return_dict=True):
+                
+        args = (hidden_states,
+                layer_num,
+                attention_mask,
+                head_mask,
+                encoder_hidden_states,
+                encoder_attention_mask,
+                past_key_values,
+                use_cache,
+                output_attentions,
+                output_hidden_states,
+                return_dict)
         args = self.layers[0](*args)
         for layer in self.layers[1:]:
             args = layer(*args)
