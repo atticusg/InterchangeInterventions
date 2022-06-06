@@ -340,7 +340,6 @@ class LIMTrainer:
                 batch = [x.to(self.device, non_blocking=True) for x in batch]
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
-                base_labels_batch = torch.Tensor(base_labels_batch, dtype=torch.LongTensor)
                 base_labels_batch = base_labels_batch.float()
                 err = self.loss(batch_preds, base_labels_batch)
                 if iit_data is not None:
