@@ -37,65 +37,45 @@ class IIT_MoNLIDataset:
 
         data = []
 
-        for example in copy.deepcopy(nmonli):
-            for example2 in copy.deepcopy(nmonli):
-                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
-                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-                intervention = self.LEXVAR
+        while True:
+            example = random.sample(nmonli)
+            example2 = random.sample(nmonli)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.NEUTRAL_LABEL
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-                base_label = self.NEUTRAL_LABEL
-                IIT_label = self.NEUTRAL_LABEL
-                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
-                if len(data) > int(self.size/4):
-                    break
+            example = random.sample(pmonli)
+            example2 = random.sample(nmonli)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.ENTAIL_LABEL
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-        random.shuffle(pmonli)
-        random.shuffle(nmonli)
+            example = random.sample(nmonli)
+            example2 = random.sample(pmonli)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.NEUTRAL_LABEL
+            IIT_label = self.ENTAIL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-        for example in copy.deepcopy(pmonli):
-            for example2 in copy.deepcopy(nmonli):
-                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
-                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-                intervention = self.LEXVAR
+            example = random.sample(pmonli)
+            example2 = random.sample(pmonli)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.ENTAIL_LABEL
+            IIT_label = self.ENTAIL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+            if len(data) > size:
+                break
 
-                base_label = self.ENTAIL_LABEL
-                IIT_label = self.NEUTRAL_LABEL
-                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
-                if len(data) > int((self.size*2)/4):
-                    break
-
-        random.shuffle(pmonli)
-        random.shuffle(nmonli)
-
-        for example in copy.deepcopy(nmonli):
-            for example2 in copy.deepcopy(pmonli):
-                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
-                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-                intervention = self.LEXVAR
-
-                base_label = self.NEUTRAL_LABEL
-                IIT_label = self.ENTAIL_LABEL
-                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
-                if len(data) > int((self.size*3)/4):
-                    break
-
-        random.shuffle(pmonli)
-        random.shuffle(nmonli)
-
-        for example2 in copy.deepcopy(pmonli):
-            for example2 in copy.deepcopy(pmonli):
-                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
-                source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-                intervention = self.LEXVAR
-
-                base_label = self.ENTAIL_LABEL
-                IIT_label = self.ENTAIL_LABEL
-                data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
-                if len(data) > int(self.size):
-                    break
-
-        random.shuffle(pmonli)
-        random.shuffle(nmonli)
 
         base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
         self.base = base
