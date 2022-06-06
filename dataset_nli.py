@@ -38,8 +38,8 @@ class IIT_MoNLIDataset:
         data = []
 
         while True:
-            example = random.sample(nmonli)
-            example2 = random.sample(nmonli)
+            example = random.choice(nmonli)
+            example2 = random.choice(nmonli)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
@@ -47,8 +47,8 @@ class IIT_MoNLIDataset:
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-            example = random.sample(pmonli)
-            example2 = random.sample(nmonli)
+            example = random.choice(pmonli)
+            example2 = random.choice(nmonli)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
@@ -56,8 +56,8 @@ class IIT_MoNLIDataset:
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-            example = random.sample(nmonli)
-            example2 = random.sample(pmonli)
+            example = random.choice(nmonli)
+            example2 = random.choice(pmonli)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
@@ -65,8 +65,8 @@ class IIT_MoNLIDataset:
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-            example = random.sample(pmonli)
-            example2 = random.sample(pmonli)
+            example = random.choice(pmonli)
+            example2 = random.choice(pmonli)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
