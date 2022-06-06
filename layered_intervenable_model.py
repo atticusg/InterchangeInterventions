@@ -66,6 +66,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         super().__init__()
         self.device = device
         self.debug = debug
+        self.combiner = torch.nn.Sequential
 
     def build_graph(self, model_layers, model_layer_dims, unwrap=None, rewrap=None):
         self.analysis_model = torch.nn.ModuleList()
@@ -90,8 +91,8 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.normal_model.extend([model_layers[-1]])
         self.analysis_model.extend([model_layers[-1]])
 
-        self.normal_model = torch.nn.Sequential(*self.normal_model)
-        self.analysis_model = torch.nn.Sequential(*self.analysis_model)
+        self.normal_model = self.combiner(*self.normal_model)
+        self.analysis_model = self.combiner(*self.analysis_model)
 
         self.set_analysis_mode(False)
 

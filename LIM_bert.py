@@ -1,12 +1,16 @@
 import torch
 from layered_intervenable_model import LayeredIntervenableModel
 
-class Unpack(torch.nn.Module):
-    def __init__(self):
+class SequentialLayers(torch.nn.Module):
+    def __init__(self, layers):
         super().__init__()
+        self.layers = layers
 
-    def forward(self, X):
-        return {"input_ids":X[0], "attention_mask":X[1]}
+    def forward(self, *args):
+        args = self.layers[0](*args)
+        for layer in self.layers[1:]:
+            args = layer(*args)
+        return *args
 
 
 
@@ -16,6 +20,7 @@ class LIMBertLayer(torch.nn.Module):
         self.bert = bert
         self.layer = layer
         self.final_layer_num = final_layer_num
+        self.combiner =
 
     def forward(self,
                 hidden_states,
@@ -136,7 +141,6 @@ class LIMBERTClassifier(LayeredIntervenableModel):
 
         self.model_dims = [n]
         self.model_layers = torch.nn.ModuleList()
-        self.model_layers.append(Unpack())
         for layer in self.bert.encoder.layer:
             self.model_layers.append(LIMBertLayer(bert, layer, len(self.bert.encoder.layer)-1))
             self.model_dims.append(n)
