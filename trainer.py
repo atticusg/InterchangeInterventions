@@ -780,8 +780,8 @@ class BERTLIMTrainer(LIMTrainer):
 
         # Dataset:
         input, mask = X_base
-        input = torch.stack(input, dim=0).float().to(device)
-        mask = torch.stack(mask, dim=0).float().to(device)
+        input = torch.stack(input, dim=0).to(device)
+        mask = torch.stack(mask, dim=0).to(device)
 
         # Model:
         self.model.to(device)
