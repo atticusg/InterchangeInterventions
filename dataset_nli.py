@@ -36,7 +36,6 @@ class NMoNLIDataset:
         with open(os.path.join(f"datasets", f"nmonli_{self.suffix}.jsonl")) as f:
             for line in f.readlines():
                 example =json.loads(line)
-                intervention = self.LEXVAR
                 base_label = self.NEUTRAL_LABEL
                 base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
                 nmonli.append((base, base_mask, base_label))
@@ -60,8 +59,7 @@ class PMoNLIDataset:
         with open(os.path.join(f"datasets", f"pmonli.jsonl")) as f:
             for line in f.readlines():
                 example =json.loads(line)
-                intervention = self.LEXVAR
-                base_label = self.NEUTRAL_LABEL
+                base_label = self.ENTAIL_LABEL
                 base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
                 pmonli.append((base, base_mask, base_label))
 
