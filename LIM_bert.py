@@ -1,6 +1,6 @@
 import torch
 from layered_intervenable_model import LayeredIntervenableModel
-from transformers import BaseModelOutputWithPastAndCrossAttentions
+from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
 
 class SequentialLayers(torch.nn.Module):
     def __init__(self, *args):
