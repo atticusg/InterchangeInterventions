@@ -73,7 +73,7 @@ class IIT_MoNLIDataset:
             base_label = self.ENTAIL_LABEL
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
-            if len(data) > size:
+            if len(data) > self.size:
                 break
 
 
