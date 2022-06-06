@@ -1,10 +1,11 @@
 import torch
 from layered_intervenable_model import LayeredIntervenableModel
+from transformers import BaseModelOutputWithPastAndCrossAttentions
 
 class SequentialLayers(torch.nn.Module):
     def __init__(self, *args):
         super().__init__()
-        self.layers = args 
+        self.layers = args
 
     def forward(self,
                 hidden_states,
