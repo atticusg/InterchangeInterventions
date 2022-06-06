@@ -160,6 +160,6 @@ class LIMBERTClassifier(LayeredIntervenableModel):
             self.bert.encoder =  self.normal_model
         print(X.shape)
         print(mask.shape)
-        output = self.bert(input_ids=X, attention_mask=mask).pooler_output
+        output = self.bert({"input_ids":X, "attention_mask"=mask}).pooler_output
         output = self.classifier_layer(output)
         return output
