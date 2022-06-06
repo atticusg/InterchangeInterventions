@@ -2,9 +2,9 @@ import torch
 from layered_intervenable_model import LayeredIntervenableModel
 
 class SequentialLayers(torch.nn.Module):
-    def __init__(self, layers):
+    def __init__(self, *args):
         super().__init__()
-        self.layers = layers
+        self.layers = args 
 
     def forward(self,
                 hidden_states,
