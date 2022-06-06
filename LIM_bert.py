@@ -20,7 +20,7 @@ class LIMBertLayer(torch.nn.Module):
         self.bert = bert
         self.layer = layer
         self.final_layer_num = final_layer_num
-        self.combiner =
+        self.combiner = SequentialLayers
 
     def forward(self,
                 hidden_states,
