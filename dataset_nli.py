@@ -12,6 +12,16 @@ def get_IIT_MoNLI_dataset(embed_func, suffix, size):
         size=size)
     return dataset.create()
 
+def get_NMoNLI_dataset(embed_func, suffix):
+    dataset = NMoNLIDataset(
+        embed_func=embed_func,
+        suffix=suffix)
+    return dataset.create()
+
+def get_PMoNLI_dataset(embed_func):
+    dataset = PMoNLIDataset(embed_func=embed_func)
+    return dataset.create()
+
 class NMoNLIDataset:
     ENTAIL_LABEL = 0
     NEUTRAL_LABEL = 1
@@ -36,7 +46,7 @@ class NMoNLIDataset:
         self.base = base
         self.base_mask = base_mask
         self.y = np.array(y)
-        return self.base, self.base_mask, self.y
+        return (self.base, self.base_mask), self.y
 
 class PMoNLIDataset:
     ENTAIL_LABEL = 0
@@ -60,7 +70,7 @@ class PMoNLIDataset:
         self.base = base
         self.base_mask = base_mask
         self.y = np.array(y)
-        return self.base, self.base_mask, self.y
+        return (self.base, self.base_mask), self.y
 
 
 class IIT_MoNLIDataset:
