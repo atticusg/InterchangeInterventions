@@ -780,8 +780,8 @@ class BERTLIMTrainer(LIMTrainer):
 
         # Dataset:
         input, mask = X_base
-        input = input.float().to(device)
-        mask = mask.float().to(device)
+        input = torch.stack(input, dim=0).float().to(device)
+        mask = torch.stack(mask, dim=0).float().to(device)
 
         # Model:
         self.model.to(device)
@@ -810,3 +810,80 @@ class BERTLIMTrainer(LIMTrainer):
 
     def process_IIT_batch(self,batch):
         return batch[3], batch[4], batch[5]
+
+
+    def iit_predict(self,
+                    base,
+                    sources,
+                    intervention_ids,
+                    intervention_ids_to_coords,
+                    device=None):
+        """
+        Internal method that subclasses are expected to use to define
+        their own `predict` functions. The hope is that this method
+        can do all the data organization and other details, allowing
+        subclasses to have compact predict methods that just encode
+        the core logic specific to them.
+
+        Parameters
+        ----------
+        *args: system inputs
+
+        device: str or None
+            Allows the user to temporarily change the device used
+            during prediction. This is useful if predictions require a
+            lot of memory and so are better done on the CPU. After
+            prediction is done, the model is returned to `self.device`.
+
+        Returns
+        -------
+        The precise return value depends on the nature of the predictions.
+        If the predictions have the same shape across all batches, then
+        we return a single tensor concatenation of them. If the shape
+        can vary across batches, as is common for sequence prediction,
+        then we return a list of tensors of varying length.
+
+        """
+        device = self.device if device is None else torch.device(device)
+
+        # Dataset:
+        base = base.float().to(device)
+
+        intervention_ids = intervention_ids.float().to(device)
+
+        base_labels = [ 0 for _ in range(base.shape[0])]
+        iit_labels = [ 0 for _ in range(base.shape[0])]
+
+        dataset = self.build_iit_dataset(base, base_labels, (sources, iit_labels, intervention_ids))
+        dataloader = self._build_dataloader(dataset, shuffle=False)
+
+        # Model:
+        self.model.to(device)
+        self.model.eval()
+
+        old_device = self.model.device
+        self.model.device = device
+
+        preds = None
+        with torch.no_grad():
+            for batch_num, batch in enumerate(dataloader, start=1):
+                batch = [x.to(device, non_blocking=True) for x in batch]
+                base_batch = batch[0]
+                base_labels_batch = batch[1]
+                sources_batch = batch[2]
+                iit_labels_batch = batch[3]
+                intervention_ids_batch = batch[4]
+                batch_iit_preds = self.model.iit_forward(
+                                base_batch,
+                                sources_batch,
+                                intervention_ids_batch,
+                                intervention_ids_to_coords)
+                if preds is None:
+                    preds = batch_iit_preds
+                else:
+                    preds = torch.cat([preds, batch_iit_preds])
+
+        # Make sure the model is back on the instance device:
+        self.model.device = old_device
+        self.model.to(self.device)
+        return preds.argmax(axis=1)
