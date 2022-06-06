@@ -152,14 +152,12 @@ class LIMBERTClassifier(LayeredIntervenableModel):
     def forward(self, pair):
         """Computes a forward pass with input `X`."""
         X, mask = pair
-        X = torch.squeeze(X)
-        mask = torch.squeeze(mask)
+        # X = torch.squeeze(X)
+        # mask = torch.squeeze(mask)
         if self.analysis:
             self.bert.encoder = self.analysis_model
         else:
             self.bert.encoder =  self.normal_model
-        print(X.shape)
-        print(mask.shape)
-        output = self.bert({"input_ids":X, "attention_mask":mask}).pooler_output
+        output = self.bert(X, attention_mask=mask).pooler_output
         output = self.classifier_layer(output)
         return output
