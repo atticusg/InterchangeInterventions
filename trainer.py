@@ -340,6 +340,8 @@ class LIMTrainer:
                 batch = [x.to(self.device, non_blocking=True) for x in batch]
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
+                print(base_labels_batch.shape)
+                print(base_batch.shape)
                 err = self.loss(batch_preds, base_labels_batch)
                 if iit_data is not None:
                     sources_batch, iit_labels_batch, intervention_ids_batch \
