@@ -340,7 +340,7 @@ class LIMTrainer:
                 batch = [x.to(self.device, non_blocking=True) for x in batch]
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
-                batch_labels_batch = torch.squeeze(batch_labels_batch)
+                base_labels_batch = torch.squeeze(base_labels_batch)
                 print(batch_preds.shape)
                 print(base_labels_batch.shape)
                 err = self.loss(batch_preds, base_labels_batch)
