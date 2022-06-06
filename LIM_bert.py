@@ -10,7 +10,7 @@ class SequentialLayers(torch.nn.Module):
         args = self.layers[0](*args)
         for layer in self.layers[1:]:
             args = layer(*args)
-        return *args
+        return args
 
 
 
