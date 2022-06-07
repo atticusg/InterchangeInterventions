@@ -743,7 +743,7 @@ class BERTLIMTrainer(LIMTrainer):
 
         sources, IIT_y, intervention_ids = iit_data
         IIT_y = torch.tensor(IIT_y)
-        sources_input, sources_mask = zip(sources)
+        sources_input, sources_mask = sources
         sources_input = [torch.FloatTensor(np.array(input)) \
                                     for input in sources_input]
         sources_mask = [torch.FloatTensor(np.array(mask)) \
