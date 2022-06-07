@@ -876,8 +876,8 @@ class BERTLIMTrainer(LIMTrainer):
 
         intervention_ids = torch.Tensor(intervention_ids).float().to(device)
 
-        base_labels = [ 0 for _ in range(base.shape[0])]
-        iit_labels = [ 0 for _ in range(base.shape[0])]
+        base_labels = [ 0 for _ in range(input_base.shape[0])]
+        iit_labels = [ 0 for _ in range(input_base.shape[0])]
 
 
         # Model:
