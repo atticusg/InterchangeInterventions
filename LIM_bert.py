@@ -240,7 +240,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
             handler.remove()
         return counterfactual_logits
 
-    def intervention_wrapper(self,output):
+    def intervention_wrapper(self,output, set):
         original_shape = copy.deepcopy(output[0].shape)
         reps = output[0].reshape((original_shape[0], -1))
         reps = torch.cat([reps[:,:set["start"]], set["intervention"],
