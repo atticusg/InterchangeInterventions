@@ -246,8 +246,8 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         reps = torch.cat([reps[:,:set["start"]], set["intervention"],
                             reps[:,set["end"]:]],
                             dim = 1)
-        output[0] = reps.reshape(original_shape)
-        return output
+        return tuple([reps.reshape(original_shape)]\
+                                + [ _ for _ in output[1:]])
 
     def retrieval_wrapper(self, output, get):
         reps = output[0].reshape((output[0].shape[0], -1))
