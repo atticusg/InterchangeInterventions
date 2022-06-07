@@ -723,30 +723,50 @@ class BERTLIMTrainer(LIMTrainer):
     def __init__(self, bert, **kwargs):
         super().__init__(bert, **kwargs)
 
+    def build_dataset(self, base_x, base_y):
+
+        base_y = torch.tensor(base_y)
+        input, mask = base_x
+        input = torch.stack(input)
+        mask = torch.stack(mask)
+
+
+        dataset = torch.utils.data.TensorDataset(input, mask, base_y)
+        return dataset
+
     def build_iit_dataset(self, base, base_y, iit_data):
+
+        base_y = torch.tensor(base_y)
+        base_input, base_mask = base_x
+        base_input = torch.stack(base_input)
+        base_mask = torch.stack(base_mask)
+
         sources, IIT_y, intervention_ids = iit_data
-        base = torch.FloatTensor(np.array(base))
-        sources = [torch.FloatTensor(np.array(source)) for source in sources]
-        sources = torch.reshape(
-            torch.stack(sources, dim=1),
-            (-1, len(sources),
-            sources[0].shape[1]))
+        IIT_y = torch.tensor(IIT_y)
+        sources_input, sources_mask = zip(sources)
+        sources_input = [torch.FloatTensor(np.array(input))) \
+                                    for input in sources_input]
+        sources_mask = [torch.FloatTensor(np.array(mask))) \
+                                    for maskin sources_mask]
+        sources_input = torch.reshape(
+            torch.stack(sources_input, dim=1),
+            (-1, len(sources_input),
+            sources_input[0].shape[1]))
+
+        sources_mask = torch.reshape(
+            torch.stack(sources_mask, dim=1),
+            (-1, len(sources_mask),
+            sources_mask[0].shape[1]))
 
         intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
-        base_y = np.array(base_y)
-        self.classes_ = sorted(set(base_y))
-        self.n_classes_ = len(self.classes_)
-        class2index = dict(zip(self.classes_, range(self.n_classes_)))
-        base_y = [class2index[label] for label in base_y]
-        base_y = torch.tensor(base_y)
-
-        IIT_y = np.array(IIT_y)
-        IIT_y = [class2index[int(label)] for label in IIT_y]
-        IIT_y = torch.tensor(IIT_y)
-
-        dataset = torch.utils.data.TensorDataset(
-            base, base_y, sources, IIT_y, intervention_ids)
+        dataset = torch.utils.data.TensorDataset(base_input,
+                                                base_mask,
+                                                base_y,
+                                                sources_input,
+                                                sources_mask,
+                                                IIT_y,
+                                                intervention_ids)
         return dataset
 
     def predict(self, X_base, device=None):
@@ -794,16 +814,6 @@ class BERTLIMTrainer(LIMTrainer):
         self.model.to(self.device)
         return preds.argmax(axis=1)
 
-    def build_dataset(self, base_x, base_y):
-
-        base_y = torch.tensor(base_y).reshape((-1,1))
-        input, mask = base_x
-        input = torch.stack(input)
-        mask = torch.stack(mask)
-
-
-        dataset = torch.utils.data.TensorDataset(input, mask, base_y)
-        return dataset
 
     def process_batch(self,batch):
         return (batch[0], batch[1]), batch[2]
@@ -847,15 +857,19 @@ class BERTLIMTrainer(LIMTrainer):
         device = self.device if device is None else torch.device(device)
 
         # Dataset:
-        base = base.float().to(device)
+        input_base, mask_base = base
+        input_base = torch.stack(input_base, dim=0).to(device)
+        mask_base = torch.stack(mask_base, dim=0).to(device)
+
+        input_sources, mask_sources= sources
+        input_sources = torch.stack(input_sources, dim=0).to(device)
+        mask_sources = torch.stack(mask_sources, dim=0).to(device)
 
         intervention_ids = intervention_ids.float().to(device)
 
         base_labels = [ 0 for _ in range(base.shape[0])]
         iit_labels = [ 0 for _ in range(base.shape[0])]
 
-        dataset = self.build_iit_dataset(base, base_labels, (sources, iit_labels, intervention_ids))
-        dataloader = self._build_dataloader(dataset, shuffle=False)
 
         # Model:
         self.model.to(device)
@@ -864,26 +878,12 @@ class BERTLIMTrainer(LIMTrainer):
         old_device = self.model.device
         self.model.device = device
 
-        preds = None
         with torch.no_grad():
-            for batch_num, batch in enumerate(dataloader, start=1):
-                batch = [x.to(device, non_blocking=True) for x in batch]
-                base_batch = batch[0]
-                base_labels_batch = batch[1]
-                sources_batch = batch[2]
-                iit_labels_batch = batch[3]
-                intervention_ids_batch = batch[4]
-                batch_iit_preds = self.model.iit_forward(
-                                base_batch,
-                                sources_batch,
-                                intervention_ids_batch,
-                                intervention_ids_to_coords)
-                if preds is None:
-                    preds = batch_iit_preds
-                else:
-                    preds = torch.cat([preds, batch_iit_preds])
+            preds = self.model.iit_forward((input_base, mask_base),
+                                            (input_sources, mask_sources),
+                                            intervention_ids,
+                                            intervention_ids_to_coords)
 
         # Make sure the model is back on the instance device:
-        self.model.device = old_device
         self.model.to(self.device)
         return preds.argmax(axis=1)

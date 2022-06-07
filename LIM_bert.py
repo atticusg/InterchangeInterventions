@@ -197,3 +197,46 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         output = self.bert(X, mask).pooler_output
         output = self.classifier_layer(output)
         return output
+
+    def iit_forward(self,
+            base_pair,
+            sources_pair,
+            intervention_ids,
+            intervention_ids_to_coords):
+        """
+        Computes a multi-source interchange interventions with base input `base`
+        and source inputs in the list `sources`. `intervention_ids` contain
+        integers that indicate where to perform interventions and
+        `intervention_ids_to_coords` is the dictionary used to translate these
+        integers to coordinates denoting the layer, start index, and end index.
+        """
+        base_x, base_mask = base_pair
+        sources_X, sources_mask = sources_pair
+        base_X = torch.squeeze(base_X)
+        base_mask = torch.squeeze(base_mask)
+        sources_mask = torch.squeeze(sources_mask)
+        sources_X = torch.squeeze(sources_X)
+
+        #unstack sources
+        sources_mask = [sources_mask[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
+           for j in range(sources.shape[1])]
+        #translate intervention_ids to coordinates
+        gets =  intervention_ids_to_coords[int(intervention_ids.flatten()[0])]
+        sets = copy.deepcopy(gets)
+        self.activation = dict()
+
+        #retrieve the value of interventions by feeding in the source inputs
+        for i, get in enumerate(gets):
+            handlers = self._gets_sets(gets =[get],sets = None)
+            source_logits = self.forward((sources_X[i], sources_mask[i]))
+            for handler in handlers:
+                handler.remove()
+            sets[i]["intervention"] =\
+                self.activation[f'{get["layer"]}-{get["start"]}-{get["end"]}']
+
+
+        handlers = self._gets_sets(gets = None, sets = sets)
+        counterfactual_logits = self.forward((base_X, base_mask))
+        for handler in handlers:
+            handler.remove()
+        return counterfactual_logits
