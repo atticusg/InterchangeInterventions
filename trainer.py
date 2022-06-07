@@ -742,12 +742,15 @@ class BERTLIMTrainer(LIMTrainer):
         base_mask = torch.stack(base_mask)
 
         sources, IIT_y, intervention_ids = iit_data
+
         IIT_y = torch.tensor(IIT_y)
-        sources_input, sources_mask = sources
+
+        sources_input, sources_mask = zip(sources)
         sources_input = [torch.FloatTensor(np.array(input)) \
                                     for input in sources_input]
         sources_mask = [torch.FloatTensor(np.array(mask)) \
                                     for mask in sources_mask]
+
         sources_input = torch.reshape(
             torch.stack(sources_input, dim=1),
             (-1, len(sources_input),

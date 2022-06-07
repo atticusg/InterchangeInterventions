@@ -143,4 +143,4 @@ class IIT_MoNLIDataset:
         self.y = np.array(y)
         self.IIT_y = np.array(IIT_y)
         self.interventions = np.array(interventions)
-        return (self.base, self.base_mask), self.y, (self.source,self.source_mask), self.IIT_y, self.interventions
+        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask)], self.IIT_y, self.interventions
