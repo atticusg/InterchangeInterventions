@@ -875,7 +875,7 @@ class BERTLIMTrainer(LIMTrainer):
         input_base = torch.stack(input_base, dim=0).to(device)
         mask_base = torch.stack(mask_base, dim=0).to(device)
 
-        input_sources, mask_sources= sources
+        input_sources, mask_sources = zip(sources)
         input_sources = torch.stack(input_sources, dim=0).to(device)
         mask_sources = torch.stack(mask_sources, dim=0).to(device)
 
