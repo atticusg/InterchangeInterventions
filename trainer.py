@@ -737,7 +737,7 @@ class BERTLIMTrainer(LIMTrainer):
     def build_iit_dataset(self, base, base_y, iit_data):
 
         base_y = torch.tensor(base_y)
-        base_input, base_mask = base_x
+        base_input, base_mask = base
         base_input = torch.stack(base_input)
         base_mask = torch.stack(base_mask)
 
