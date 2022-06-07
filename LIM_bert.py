@@ -210,7 +210,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         `intervention_ids_to_coords` is the dictionary used to translate these
         integers to coordinates denoting the layer, start index, and end index.
         """
-        base_x, base_mask = base_pair
+        base_X, base_mask = base_pair
         sources_X, sources_mask = sources_pair
         base_X = torch.squeeze(base_X)
         base_mask = torch.squeeze(base_mask)
