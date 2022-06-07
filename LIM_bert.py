@@ -210,8 +210,8 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         `intervention_ids_to_coords` is the dictionary used to translate these
         integers to coordinates denoting the layer, start index, and end index.
         """
-        base_X, base_mask = base_pair
-        sources_X, sources_mask = sources_pair
+        base_input, base_mask = base_pair
+        sources_input, sources_mask = sources_pair
 
         #unstack sources
         sources_mask = [sources_mask[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
@@ -226,7 +226,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         #retrieve the value of interventions by feeding in the source inputs
         for i, get in enumerate(gets):
             handlers = self._gets_sets(gets =[get],sets = None)
-            source_logits = self.forward((sources_X[i], sources_mask[i]))
+            source_logits = self.forward((sources_input[i], sources_mask[i]))
             for handler in handlers:
                 handler.remove()
             sets[i]["intervention"] =\
@@ -234,7 +234,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
 
 
         handlers = self._gets_sets(gets = None, sets = sets)
-        counterfactual_logits = self.forward((base_X, base_mask))
+        counterfactual_logits = self.forward((base_input, base_mask))
         for handler in handlers:
             handler.remove()
         return counterfactual_logits
