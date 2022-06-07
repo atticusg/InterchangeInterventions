@@ -179,6 +179,10 @@ class LayeredIntervenableModel(torch.nn.Module):
             handler.remove()
         return counterfactual_logits
 
+    def intervention_wrapper(self,output):
+        return torch.cat([output[:,:set["start"]], set["intervention"],
+                            output[:,set["end"]:]],
+                            dim = 1)
 
     def make_hook(self, gets, sets, layer):
         """
@@ -202,10 +206,7 @@ class LayeredIntervenableModel(torch.nn.Module):
                     if layer == set["layer"]:
                         layer_sets.append(set)
             for set in layer_sets:
-                output = torch.cat(
-                            [output[:,:set["start"]], set["intervention"],
-                            output[:,set["end"]:]],
-                            dim = 1)
+                output = self.intervention_wrapper(output)
             return output
         return hook
 
