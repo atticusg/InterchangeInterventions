@@ -1,4 +1,5 @@
 import torch
+import copy
 from layered_intervenable_model import LayeredIntervenableModel
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
 
