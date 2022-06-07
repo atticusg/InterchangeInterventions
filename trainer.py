@@ -833,7 +833,7 @@ class BERTLIMTrainer(LIMTrainer):
         return (batch[0], batch[1]), batch[2]
 
     def process_IIT_batch(self,batch):
-        return batch[3], batch[4], batch[5]
+        return (batch[3], batch[4]), batch[5], batch[6]
 
 
     def iit_predict(self,
