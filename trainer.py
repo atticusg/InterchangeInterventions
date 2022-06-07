@@ -766,14 +766,6 @@ class BERTLIMTrainer(LIMTrainer):
 
         intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
-        print(base_input.shape)
-        print(base_mask.shape)
-        print(base_y.shape)
-        print(sources_input.shape)
-        print(sources_mask.shape)
-        print(IIT_y.shape)
-        print(intervention_ids.shape)
-
         dataset = torch.utils.data.TensorDataset(base_input,
                                                 base_mask,
                                                 base_y,
@@ -882,7 +874,7 @@ class BERTLIMTrainer(LIMTrainer):
         input_sources = torch.stack(input_sources, dim=0).to(device)
         mask_sources = torch.stack(mask_sources, dim=0).to(device)
 
-        intervention_ids = intervention_ids.float().to(device)
+        intervention_ids = torch.Tensor(intervention_ids).float().to(device)
 
         base_labels = [ 0 for _ in range(base.shape[0])]
         iit_labels = [ 0 for _ in range(base.shape[0])]
