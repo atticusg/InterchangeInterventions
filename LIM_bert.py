@@ -250,5 +250,5 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         return output
 
     def retrieval_wrapper(self, output, get):
-        reps = output[0].reshape((original_shape[0], -1))
+        reps = output[0].reshape((output[0].shape[0], -1))
         return reps[:,get["start"]: get["end"] ]
