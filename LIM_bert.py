@@ -212,10 +212,6 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         """
         base_X, base_mask = base_pair
         sources_X, sources_mask = sources_pair
-        base_X = torch.squeeze(base_X)
-        base_mask = torch.squeeze(base_mask)
-        sources_mask = torch.squeeze(sources_mask)
-        sources_X = torch.squeeze(sources_X)
 
         #unstack sources
         sources_mask = [sources_mask[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
