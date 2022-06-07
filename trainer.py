@@ -745,7 +745,10 @@ class BERTLIMTrainer(LIMTrainer):
 
         IIT_y = torch.tensor(IIT_y)
 
-        sources_input, sources_mask = zip(sources)
+        if len(sources) == 1:
+            sources_input, sources_mask = sources[0]
+        else:
+            sources_input, sources_mask = zip(sources)
         sources_input = [torch.FloatTensor(np.array(input)) \
                                     for input in sources_input]
         sources_mask = [torch.FloatTensor(np.array(mask)) \
