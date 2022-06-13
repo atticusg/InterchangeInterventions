@@ -301,9 +301,11 @@ class IIT_PremackDataset:
 
     def _create_diff_pair(self):
         if self.bert:
-            vec1 = rand_token_id(self.token_ids)
-            vec2 = rand_token_id(self.token_ids)
-            assert not vec1 == vec2
+            while True:
+                vec1 = rand_token_id(self.token_ids)
+                vec2 = rand_token_id(self.token_ids)
+                if not vec1 == vec2:
+                    break
         else:
             vec1 = randvec(self.embed_dim)
             vec2 = randvec(self.embed_dim)
@@ -410,9 +412,11 @@ class IIT_PremackDatasetControl13:
 
     def _create_diff_pair(self):
         if self.bert:
-            vec1 = rand_token_id(self.token_ids)
-            vec2 = rand_token_id(self.token_ids)
-            assert not vec1 == vec2
+            while True:
+                vec1 = rand_token_id(self.token_ids)
+                vec2 = rand_token_id(self.token_ids)
+                if not vec1 == vec2:
+                    break
         else:
             vec1 = randvec(self.embed_dim)
             vec2 = randvec(self.embed_dim)
@@ -510,9 +514,11 @@ class IIT_PremackDatasetBoth:
 
     def _create_diff_pair(self):
         if self.bert:
-            vec1 = rand_token_id(self.token_ids)
-            vec2 = rand_token_id(self.token_ids)
-            assert not vec1 == vec2
+            while True:
+                vec1 = rand_token_id(self.token_ids)
+                vec2 = rand_token_id(self.token_ids)
+                if not vec1 == vec2:
+                    break
         else:
             vec1 = randvec(self.embed_dim)
             vec2 = randvec(self.embed_dim)
