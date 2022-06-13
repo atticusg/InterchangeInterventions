@@ -7,6 +7,9 @@ from utils import randvec
 __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
+def rand_token_id(token_ids):
+    return random.choice(token_ids)
+
 
 def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     train_dataset = IIT_PremackDatasetBoth(
