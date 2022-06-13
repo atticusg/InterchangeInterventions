@@ -448,14 +448,25 @@ class IIT_PremackDatasetBoth:
         data = []
         for _ in range(self.size):
             rep = [self._create_random_pair() for _ in range(6)]
-            if (rep[0][0] == rep[0][1]).all() == (rep[1][0] == rep[1][1]).all():
-                base_label = self.POS_LABEL
+            if self.bert:
+                if (rep[0][0] == rep[0][1]) == (rep[1][0] == rep[1][1]):
+                    base_label = self.POS_LABEL
+                else:
+                    base_label = self.NEG_LABEL
+                if (rep[2][0] == rep[2][1]) == (rep[5][0] == rep[5][1]):
+                    IIT_label = self.POS_LABEL
+                else:
+                    IIT_label = self.NEG_LABEL
+
             else:
-                base_label = self.NEG_LABEL
-            if (rep[2][0] == rep[2][1]).all() == (rep[5][0] == rep[5][1]).all():
-                IIT_label = self.POS_LABEL
-            else:
-                IIT_label = self.NEG_LABEL
+                if (rep[0][0] == rep[0][1]).all() == (rep[1][0] == rep[1][1]).all():
+                    base_label = self.POS_LABEL
+                else:
+                    base_label = self.NEG_LABEL
+                if (rep[2][0] == rep[2][1]).all() == (rep[5][0] == rep[5][1]).all():
+                    IIT_label = self.POS_LABEL
+                else:
+                    IIT_label = self.NEG_LABEL
             data.append((rep,base_label, IIT_label, self.both_coord_id))
         random.shuffle(data)
         data = data.copy()
