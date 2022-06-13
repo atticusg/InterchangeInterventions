@@ -108,12 +108,13 @@ class IIT_PremackDataset:
         self.data += self._create_diff_same_to_diff()
         random.shuffle(self.data)
         data = self.data.copy()
-        if self.flatten_root or self.flatten_leaves:
-            data = [((np.concatenate(x1), np.concatenate(x2)),(np.concatenate(x3), np.concatenate(x4)), base_label, IIT_label, intervention)
-                    for (x1, x2,x3,x4), base_label, IIT_label, intervention in data]
         if self.flatten_root:
-            data = [(np.concatenate(base), np.concatenate(source), label, IIT_label, intervention)
-                    for base, source, label, IIT_label, intervention in data]
+            if self.bert:
+                data = [(np.array(base), np.array(source),np.array(source2), label, IIT_label, intervention)
+                        for (base, source, source2), label, IIT_label, intervention in data]
+            else:
+                data = [(np.concatenate(base), np.concatenate(source),np.concatenate(source2), label, IIT_label, intervention)
+                        for (base, source, source2), label, IIT_label, intervention in data]
         base, source, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
         self.source = np.array(source)
@@ -348,12 +349,13 @@ class IIT_PremackDatasetControl13:
         data = self._create_control13(self.size)
         random.shuffle(data)
         data = data.copy()
-        if self.flatten_root or self.flatten_leaves:
-            data = [((np.concatenate(x1), np.concatenate(x2)),(np.concatenate(x3), np.concatenate(x4)), base_label, IIT_label, intervention)
-                    for (x1, x2,x3,x4), base_label, IIT_label, intervention in data]
         if self.flatten_root:
-            data = [(np.concatenate(base), np.concatenate(source), label, IIT_label, intervention)
-                    for base, source, label, IIT_label, intervention in data]
+            if self.bert:
+                data = [(np.array(base), np.array(source),np.array(source2), label, IIT_label, intervention)
+                        for (base, source, source2), label, IIT_label, intervention in data]
+            else:
+                data = [(np.concatenate(base), np.concatenate(source),np.concatenate(source2), label, IIT_label, intervention)
+                        for (base, source, source2), label, IIT_label, intervention in data]
         base, source, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
         self.source = np.array(source)
@@ -474,21 +476,13 @@ class IIT_PremackDatasetBoth:
             data.append((rep,base_label, IIT_label, self.both_coord_id))
         random.shuffle(data)
         data = data.copy()
-        if self.flatten_root or self.flatten_leaves:
-            data = [
-                (
-                    (
-                        (np.concatenate(x1), np.concatenate(x2)),
-                        (np.concatenate(x3), np.concatenate(x4)),
-                        (np.concatenate(x5), np.concatenate(x6))
-                    ),
-                    base_label, IIT_label, intervention
-                )
-                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
-            ]
         if self.flatten_root:
-            data = [(np.concatenate(base), np.concatenate(source),np.concatenate(source2), label, IIT_label, intervention)
-                    for (base, source, source2), label, IIT_label, intervention in data]
+            if self.bert:
+                data = [(np.array(base), np.array(source),np.array(source2), label, IIT_label, intervention)
+                        for (base, source, source2), label, IIT_label, intervention in data]
+            else:
+                data = [(np.concatenate(base), np.concatenate(source),np.concatenate(source2), label, IIT_label, intervention)
+                        for (base, source, source2), label, IIT_label, intervention in data]
         base, source, source2, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
         self.source = np.array(source)
