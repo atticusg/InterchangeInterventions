@@ -17,8 +17,9 @@ def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
         size=size,
         token_ids=token_ids)
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
-    X_base_train = torch.tensor(X_base_train)
-    X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
+    if token_ids is None:
+        X_base_train = torch.tensor(X_base_train)
+        X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
     y_base_train = torch.tensor(y_base_train)
     y_IIT_train = torch.tensor(y_IIT_train)
     interventions = torch.tensor(interventions)
@@ -32,8 +33,9 @@ def get_IIT_equality_dataset_control13(embed_dim, size, token_ids =None):
         n_neg=class_size,
         token_ids=token_ids)
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
-    X_base_train = torch.tensor(X_base_train)
-    X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
+    if token_ids is None:
+        X_base_train = torch.tensor(X_base_train)
+        X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
     y_base_train = torch.tensor(y_base_train)
     y_IIT_train = torch.tensor(y_IIT_train)
     interventions = torch.tensor(interventions)
@@ -49,8 +51,9 @@ def get_IIT_equality_dataset(variable, embed_dim, size, token_ids =None):
         n_neg=class_size,
         token_ids=token_ids)
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
-    X_base_train = torch.tensor(X_base_train)
-    X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
+    if token_ids is None:
+        X_base_train = torch.tensor(X_base_train)
+        X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
     y_base_train = torch.tensor(y_base_train)
     y_IIT_train = torch.tensor(y_IIT_train)
     interventions = torch.tensor(interventions)
