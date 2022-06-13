@@ -8,10 +8,11 @@ __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
 
-def get_IIT_equality_dataset_both(embed_dim, size):
+def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     train_dataset = IIT_PremackDatasetBoth(
         embed_dim=embed_dim,
-        size=size)
+        size=size,
+        token_ids=token_ids)
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
     X_base_train = torch.tensor(X_base_train)
     X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
@@ -20,12 +21,13 @@ def get_IIT_equality_dataset_both(embed_dim, size):
     interventions = torch.tensor(interventions)
     return X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions
 
-def get_IIT_equality_dataset_control13(embed_dim, size):
+def get_IIT_equality_dataset_control13(embed_dim, size, token_ids =None):
     class_size = size/2
     train_dataset = IIT_PremackDatasetControl13(
         embed_dim=embed_dim,
         n_pos=class_size,
-        n_neg=class_size)
+        n_neg=class_size,
+        token_ids=token_ids)
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
     X_base_train = torch.tensor(X_base_train)
     X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
@@ -35,13 +37,14 @@ def get_IIT_equality_dataset_control13(embed_dim, size):
     return X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions
 
 
-def get_IIT_equality_dataset(variable, embed_dim, size):
+def get_IIT_equality_dataset(variable, embed_dim, size, token_ids =None):
     class_size = size/2
     train_dataset = IIT_PremackDataset(
         variable,
         embed_dim=embed_dim,
         n_pos=class_size,
-        n_neg=class_size)
+        n_neg=class_size,
+        token_ids=token_ids)
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
     X_base_train = torch.tensor(X_base_train)
     X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
@@ -58,8 +61,13 @@ class IIT_PremackDataset:
     NEG_LABEL = 0
 
     def __init__(self, variable, embed_dim=50, n_pos=500, n_neg=500,
-                 flatten_root=True, flatten_leaves=True, intermediate=False):
+                 flatten_root=True, flatten_leaves=True, intermediate=False, token_ids = None):
 
+        if token_ids is None:
+            self.bert = False
+        else:
+            self.bert = True
+            self.token_ids = token_ids
         self.variable = variable
         self.embed_dim = embed_dim
         self.n_pos = n_pos
@@ -282,13 +290,21 @@ class IIT_PremackDataset:
             return self._create_diff_pair()
 
     def _create_same_pair(self):
-        vec = randvec(self.embed_dim)
+        if self.bert:
+            vec = rand_token_id(self.token_ids)
+        else:
+            vec = randvec(self.embed_dim)
         return (vec, vec)
 
     def _create_diff_pair(self):
-        vec1 = randvec(self.embed_dim)
-        vec2 = randvec(self.embed_dim)
-        assert not np.array_equal(vec1, vec2)
+        if self.bert:
+            vec1 = rand_token_id(self.token_ids)
+            vec2 = rand_token_id(self.token_ids)
+            assert not vec1 == vec2
+        else:
+            vec1 = randvec(self.embed_dim)
+            vec2 = randvec(self.embed_dim)
+            assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
 
 class IIT_PremackDatasetControl13:
@@ -298,8 +314,14 @@ class IIT_PremackDatasetControl13:
     POS_LABEL = 1
     NEG_LABEL = 0
 
-    def __init__(self, embed_dim=50, n_pos=500, n_neg=500,
-                 flatten_root=True, flatten_leaves=True, intermediate=False):
+    def __init__(self, embed_dim=50, n_pos=500, n_neg=500, flatten_root=True,
+        flatten_leaves=True, intermediate=False, token_ids = None):
+
+        if token_ids is None:
+            self.bert = False
+        else:
+            self.bert = True
+            self.token_ids = token_ids
 
         self.embed_dim = embed_dim
         self.n_pos = n_pos
@@ -377,13 +399,21 @@ class IIT_PremackDatasetControl13:
             return self._create_diff_pair()
 
     def _create_same_pair(self):
-        vec = randvec(self.embed_dim)
+        if self.bert:
+            vec = rand_token_id(self.token_ids)
+        else:
+            vec = randvec(self.embed_dim)
         return (vec, vec)
 
     def _create_diff_pair(self):
-        vec1 = randvec(self.embed_dim)
-        vec2 = randvec(self.embed_dim)
-        assert not np.array_equal(vec1, vec2)
+        if self.bert:
+            vec1 = rand_token_id(self.token_ids)
+            vec2 = rand_token_id(self.token_ids)
+            assert not vec1 == vec2
+        else:
+            vec1 = randvec(self.embed_dim)
+            vec2 = randvec(self.embed_dim)
+            assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
 
 class IIT_PremackDatasetBoth:
@@ -394,7 +424,14 @@ class IIT_PremackDatasetBoth:
     NEG_LABEL = 0
     both_coord_id = 2
 
-    def __init__(self, size= 1000, embed_dim=50,  flatten_root=True, flatten_leaves=True, intermediate=False):
+    def __init__(self, size= 1000, embed_dim=50,  flatten_root=True,
+        flatten_leaves=True, intermediate=False, token_ids = None):
+
+        if token_ids is None:
+            self.bert = False
+        else:
+            self.bert = True
+            self.token_ids = token_ids
 
         self.embed_dim = embed_dim
         self.size= size
@@ -451,11 +488,19 @@ class IIT_PremackDatasetBoth:
             return self._create_diff_pair()
 
     def _create_same_pair(self):
-        vec = randvec(self.embed_dim)
+        if self.bert:
+            vec = rand_token_id(self.token_ids)
+        else:
+            vec = randvec(self.embed_dim)
         return (vec, vec)
 
     def _create_diff_pair(self):
-        vec1 = randvec(self.embed_dim)
-        vec2 = randvec(self.embed_dim)
-        assert not np.array_equal(vec1, vec2)
+        if self.bert:
+            vec1 = rand_token_id(self.token_ids)
+            vec2 = rand_token_id(self.token_ids)
+            assert not vec1 == vec2
+        else:
+            vec1 = randvec(self.embed_dim)
+            vec2 = randvec(self.embed_dim)
+            assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
