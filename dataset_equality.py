@@ -8,7 +8,7 @@ __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
 def totuple(a):
-    return tuple(i for i in a)
+    return tuple(torch.tensor(i) for i in a)
 
 def rand_token_id(token_ids):
     return random.choice(token_ids)
