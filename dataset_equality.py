@@ -63,8 +63,13 @@ class IIT_PremackDataset:
     POS_LABEL = 1
     NEG_LABEL = 0
 
-    def __init__(self, variable, embed_dim=50, n_pos=500, n_neg=500,
-                 flatten_root=True, flatten_leaves=True, intermediate=False, token_ids = None):
+    def __init__(self,
+                variable,
+                embed_dim=50,
+                n_pos=500,
+                n_neg=500,
+                intermediate=False,
+                token_ids = None):
 
         if token_ids is None:
             self.bert = False
@@ -92,8 +97,6 @@ class IIT_PremackDataset:
         self.n_same_diff_to_diff = int(n_neg / 4)
         self.n_diff_same_to_diff = int(n_neg / 4)
 
-        self.flatten_root = flatten_root
-        self.flatten_leaves = flatten_leaves
         self.intermediate = intermediate
 
     def create(self):
@@ -108,13 +111,26 @@ class IIT_PremackDataset:
         self.data += self._create_diff_same_to_diff()
         random.shuffle(self.data)
         data = self.data.copy()
-        if self.flatten_root:
-            if self.bert:
-                data = [(np.array(base), np.array(source),np.array(source2), label, IIT_label, intervention)
-                        for (base, source, source2), label, IIT_label, intervention in data]
-            else:
-                data = [(np.concatenate(base), np.concatenate(source),np.concatenate(source2), label, IIT_label, intervention)
-                        for (base, source, source2), label, IIT_label, intervention in data]
+        if self.bert:
+            data = [
+                (
+                    np.array(x1 + x2),
+                    np.array(x3 + x4),
+                    np.array(x5 + x6),
+                    base_label, IIT_label, intervention
+                )
+                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+            ]
+        else:
+            data = [
+                (
+                    np.concatenate(x1 + x2),
+                    np.concatenate(x3 + x4),
+                    np.concatenate(x5 + x6),
+                    base_label, IIT_label, intervention
+                )
+                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+            ]
         base, source, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
         self.source = np.array(source)
@@ -320,8 +336,12 @@ class IIT_PremackDatasetControl13:
     POS_LABEL = 1
     NEG_LABEL = 0
 
-    def __init__(self, embed_dim=50, n_pos=500, n_neg=500, flatten_root=True,
-        flatten_leaves=True, intermediate=False, token_ids = None):
+    def __init__(self,
+                embed_dim=50,
+                n_pos=500,
+                n_neg=500,
+                intermediate=False,
+                token_ids = None):
 
         if token_ids is None:
             self.bert = False
@@ -341,21 +361,32 @@ class IIT_PremackDatasetControl13:
 
         self.size = n_pos + n_neg
 
-        self.flatten_root = flatten_root
-        self.flatten_leaves = flatten_leaves
         self.intermediate = intermediate
 
     def create(self):
         data = self._create_control13(self.size)
         random.shuffle(data)
         data = data.copy()
-        if self.flatten_root:
-            if self.bert:
-                data = [(np.array(base), np.array(source),np.array(source2), label, IIT_label, intervention)
-                        for (base, source, source2), label, IIT_label, intervention in data]
-            else:
-                data = [(np.concatenate(base), np.concatenate(source),np.concatenate(source2), label, IIT_label, intervention)
-                        for (base, source, source2), label, IIT_label, intervention in data]
+        if self.bert:
+            data = [
+                (
+                    np.array(x1 + x2),
+                    np.array(x3 + x4),
+                    np.array(x5 + x6),
+                    base_label, IIT_label, intervention
+                )
+                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+            ]
+        else:
+            data = [
+                (
+                    np.concatenate(x1 + x2),
+                    np.concatenate(x3 + x4),
+                    np.concatenate(x5 + x6),
+                    base_label, IIT_label, intervention
+                )
+                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+            ]
         base, source, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
         self.source = np.array(source)
@@ -433,8 +464,11 @@ class IIT_PremackDatasetBoth:
     NEG_LABEL = 0
     both_coord_id = 2
 
-    def __init__(self, size= 1000, embed_dim=50,  flatten_root=True,
-        flatten_leaves=True, intermediate=False, token_ids = None):
+    def __init__(self,
+                size= 1000,
+                embed_dim=50,
+                intermediate=False,
+                token_ids = None):
 
         if token_ids is None:
             self.bert = False
@@ -446,8 +480,6 @@ class IIT_PremackDatasetBoth:
         self.size= size
 
 
-        self.flatten_root = flatten_root
-        self.flatten_leaves = flatten_leaves
         self.intermediate = intermediate
 
     def create(self):
@@ -476,13 +508,26 @@ class IIT_PremackDatasetBoth:
             data.append((rep,base_label, IIT_label, self.both_coord_id))
         random.shuffle(data)
         data = data.copy()
-        if self.flatten_root:
-            if self.bert:
-                data = [(np.array(base), np.array(source),np.array(source2), label, IIT_label, intervention)
-                        for (base, source, source2), label, IIT_label, intervention in data]
-            else:
-                data = [(np.concatenate(base), np.concatenate(source),np.concatenate(source2), label, IIT_label, intervention)
-                        for (base, source, source2), label, IIT_label, intervention in data]
+        if self.bert:
+            data = [
+                (
+                    np.array(x1 + x2),
+                    np.array(x3 + x4),
+                    np.array(x5 + x6),
+                    base_label, IIT_label, intervention
+                )
+                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+            ]
+        else:
+            data = [
+                (
+                    np.concatenate(x1 + x2),
+                    np.concatenate(x3 + x4),
+                    np.concatenate(x5 + x6),
+                    base_label, IIT_label, intervention
+                )
+                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+            ]
         base, source, source2, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
         self.source = np.array(source)
