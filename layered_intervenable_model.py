@@ -20,6 +20,8 @@ class LinearLayer(torch.nn.Module):
         torch.nn.init.orthogonal_(self.weight)
 
     def forward(self, x):
+        print(x.device)
+        print(self.weight.device)
         return torch.matmul(x, self.weight)
 
 class LayeredIntervenableModel(torch.nn.Module):
