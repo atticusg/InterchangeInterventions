@@ -108,7 +108,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         for layer in self.labeled_layers:
             layer["model"].to(device)
             if "disentangle" in layer:
-                layer["disentangle"].to(device)
+                layer["disentangle"].parametrizations.weight.to(device)
             if "reentangle" in layer:
                 layer["reentangle"].to(device)
 
