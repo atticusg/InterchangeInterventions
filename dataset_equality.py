@@ -15,14 +15,14 @@ def rand_token_id(token_ids):
 
 def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
     V1_dataset = get_IIT_equality_dataset("V1",
-                                        embedding_dim,
+                                        embed_dim,
                                         size,
                                         token_ids =token_ids)
     V2_dataset = get_IIT_equality_dataset("V2",
-                                        embedding_dim,
+                                        embed_dim,
                                         size,
                                         token_ids =token_ids)
-    both_dataset = get_IIT_equality_dataset_both(embedding_dim,
+    both_dataset = get_IIT_equality_dataset_both(embed_dim,
                                                 size,
                                                 token_ids =token_ids)
     combined_dataset = ( torch.cat((V1_dataset[0],
