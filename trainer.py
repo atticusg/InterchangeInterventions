@@ -746,9 +746,9 @@ class BERTLIMTrainer(LIMTrainer):
         IIT_y = torch.tensor(IIT_y)
 
         if len(sources) == 1:
-            sources_input, sources_mask = sources[0]
+            sources_input, sources_mask = sources
         else:
-            sources_input, sources_mask = zip(sources)
+            sources_input, sources_mask = zip(*sources)
         sources_input = [ torch.stack(input) for input in sources_input]
         sources_mask = [ torch.stack(mask) for mask in sources_mask]
 
