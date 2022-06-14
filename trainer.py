@@ -641,7 +641,7 @@ class LIMTrainer:
 
         # Make sure the model is back on the instance device:
         self.model.set_device(self.device)
-        self.mode.device = old_device
+        self.model.device = old_device
         return preds.argmax(axis=1)
 
 
