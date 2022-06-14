@@ -45,7 +45,7 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     both_dataset[1]))
                        )
 
-    return combined_datset
+    return combined_dataset
 
 def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     train_dataset = IIT_PremackDatasetBoth(
