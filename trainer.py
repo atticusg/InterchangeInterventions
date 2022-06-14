@@ -822,6 +822,7 @@ class BERTLIMTrainer(LIMTrainer):
 
         # Model:
         self.model.to(device)
+        self.model.bert.to(device)
         self.model.eval()
 
         with torch.no_grad():
@@ -829,6 +830,7 @@ class BERTLIMTrainer(LIMTrainer):
 
         # Make sure the model is back on the instance device:
         self.model.to(self.device)
+        self.model.bert.to(self.device)
         return preds.argmax(axis=1)
 
 
