@@ -764,6 +764,14 @@ class BERTLIMTrainer(LIMTrainer):
 
         intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
+        print(base_input.shape,
+                base_mask.shape,
+                base_y.shape,
+                sources_input.shape,
+                sources_mask.shape,
+                IIT_y.shape,
+                intervention_ids.shape)
+
         dataset = torch.utils.data.TensorDataset(base_input,
                                                 base_mask,
                                                 base_y,
