@@ -42,7 +42,7 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     both_dataset[1])),
                        torch.cat((V1_dataset[4],
                                     V2_dataset[4],
-                                    both_dataset[1])),
+                                    both_dataset[1]))
                        )
 
     return combined_datset
