@@ -639,8 +639,7 @@ class LIMTrainer:
                     preds = torch.cat([preds, batch_iit_preds])
 
         # Make sure the model is back on the instance device:
-        self.model.device = old_device
-        self.model.to(self.device)
+        self.model.set_device(self.device)
         return preds.argmax(axis=1)
 
 
