@@ -21,6 +21,7 @@ class LinearLayer(torch.nn.Module):
 
     def set_device(self, device):
         self.weight.to(device)
+        self.parametrizations.to(device)
 
     def forward(self, x):
         return torch.matmul(x, self.weight)
