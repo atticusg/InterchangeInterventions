@@ -20,6 +20,7 @@ class LinearLayer(torch.nn.Module):
         torch.nn.init.orthogonal_(self.weight)
 
     def forward(self, x):
+        print(x.device)
         return torch.matmul(x, self.weight)
 
 class LayeredIntervenableModel(torch.nn.Module):
@@ -107,6 +108,9 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.normal_model.to(device)
         if hasattr(self, "bert"):
             self.bert.to(device)
+        # for layer in self.analysis_model:
+        #     if isinstance(layer, LinearLayer):
+        #         layer.weight.to(device)
 
     def freeze_disentangling_parameters(self):
         """Freezes the orthogonal transformations used for disentangling"""
