@@ -819,7 +819,7 @@ class BERTLIMTrainer(LIMTrainer):
             preds = self.model((input, mask))
 
         # Make sure the model is back on the instance device:
-        self.model.set_device(device)
+        self.model.set_device(self.device)
         return preds.argmax(axis=1)
 
 
@@ -892,7 +892,7 @@ class BERTLIMTrainer(LIMTrainer):
 
 
         # Model:
-        self.model.to(device)
+        self.model.set_device(device)
         self.model.eval()
 
         old_device = self.model.device
@@ -905,5 +905,5 @@ class BERTLIMTrainer(LIMTrainer):
                                             intervention_ids_to_coords)
 
         # Make sure the model is back on the instance device:
-        self.model.to(self.device)
+        self.model.set_device(self.device)
         return preds.argmax(axis=1)
