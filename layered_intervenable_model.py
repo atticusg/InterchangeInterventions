@@ -102,7 +102,7 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.unfreeze_model_parameters()
 
     def set_device(self, device):
-        self.to(device)
+        self.bert.to(device)
         self.analysis_model.to(device)
         self.normal_model.to(device)
 
