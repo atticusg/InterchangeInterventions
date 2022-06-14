@@ -194,9 +194,9 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         X = torch.squeeze(X).long().to(self.device)
         mask = torch.squeeze(mask).to(self.device)
         if self.analysis:
-            self.bert.encoder = self.analysis_model
+            self.bert.encoder = self.analysis_model.to(self.device)
         else:
-            self.bert.encoder =  self.normal_model
+            self.bert.encoder =  self.normal_model.to(self.device)
         output = self.bert(X, mask).pooler_output
         output = self.classifier_layer(output)
         return output
@@ -215,6 +215,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         """
         base_input, base_mask = base_pair
         sources_input, sources_mask = sources_pair
+
 
         #unstack sources
         sources_mask = [sources_mask[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
