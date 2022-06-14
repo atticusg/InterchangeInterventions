@@ -877,9 +877,9 @@ class BERTLIMTrainer(LIMTrainer):
             mask_sources = []
             for input_source, mask_source in sources:
                 input_sources.append(torch.stack(
-                                    input_sources, dim=0).to(device))
+                                    input_source, dim=0).to(device))
                 mask_sources.append(torch.stack(
-                                    mask_sources, dim=0).to(device))
+                                    mask_source, dim=0).to(device))
             input_sources = torch.stack(input_sources, dim=1)
             mask_sources = torch.stack(mask_sources, dim=1)
 
