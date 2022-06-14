@@ -154,6 +154,7 @@ class LIMTrainer:
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
+            print(device)
         self.device = torch.device(device)
         self.display_progress = display_progress
         self.optimizer_kwargs = optimizer_kwargs
