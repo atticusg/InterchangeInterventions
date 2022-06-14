@@ -335,7 +335,6 @@ class LIMTrainer:
 
         self.model.train()
         self.optimizer.zero_grad()
-        print("fit dev", self.device)
 
         for iteration in range(1, self.max_iter+1):
 
@@ -615,6 +614,10 @@ class LIMTrainer:
 
         # Model:
         self.model.set_device(device)
+
+        old_device = self.model.device
+        self.model.device = device
+
         self.model.eval()
 
         preds = None
@@ -638,6 +641,7 @@ class LIMTrainer:
 
         # Make sure the model is back on the instance device:
         self.model.set_device(self.device)
+        self.mode.device = old_device
         return preds.argmax(axis=1)
 
 
