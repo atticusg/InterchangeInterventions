@@ -13,6 +13,39 @@ def totuple(a):
 def rand_token_id(token_ids):
     return random.choice(token_ids)
 
+def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
+    V1_dataset = get_IIT_equality_dataset("V1",
+                                        embedding_dim,
+                                        size,
+                                        token_ids =token_ids)
+    V2_dataset = get_IIT_equality_dataset("V2",
+                                        embedding_dim,
+                                        size,
+                                        token_ids =token_ids)
+    both_dataset = get_IIT_equality_dataset_both(embedding_dim,
+                                                size,
+                                                token_ids =token_ids)
+    combined_dataset = ( torch.cat((V1_dataset[0],
+                                    V2_dataset[0],
+                                    both_dataset[0])),
+                       torch.cat((V1_dataset[1],
+                                    V2_dataset[1]
+                                    both_dataset[1])),
+                       [torch.cat((V1_dataset[2][0],
+                                    V2_dataset[2][0],
+                                    both_dataset[2][0])),
+                       torch.cat((V1_dataset[2][0],
+                                    V2_dataset[2][0],
+                                    both_dataset[2][1])),
+                       torch.cat((V1_dataset[3],
+                                    V2_dataset[3],
+                                    both_dataset[1])),
+                       torch.cat((V1_dataset[4],
+                                    V2_dataset[4],
+                                    both_dataset[1])),
+                       )
+
+    return combined_datset
 
 def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     train_dataset = IIT_PremackDatasetBoth(

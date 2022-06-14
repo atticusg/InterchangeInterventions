@@ -870,10 +870,19 @@ class BERTLIMTrainer(LIMTrainer):
 
         if len(sources) == 1:
             input_sources, mask_sources = sources[0]
+            input_sources = torch.stack(input_sources, dim=0).to(device)
+            mask_sources = torch.stack(mask_sources, dim=0).to(device)
         else:
-            input_sources, mask_sources = zip(sources)
-        input_sources = torch.stack(input_sources, dim=0).to(device)
-        mask_sources = torch.stack(mask_sources, dim=0).to(device)
+            input_sources = []
+            mask_sources = []
+            for input_source, mask_source in sources:
+                input_sources.append(torch.stack(
+                                    input_sources, dim=0).to(device))
+                mask_sources.append(torch.stack(
+                                    mask_sources, dim=0).to(device))
+            input_sources = torch.stack(input_sources, dim=1)
+            mask_sources = torch.stack(mask_sources, dim=1)
+
 
         intervention_ids = torch.Tensor(intervention_ids).float().to(device)
 
