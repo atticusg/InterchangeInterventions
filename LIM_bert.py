@@ -216,9 +216,9 @@ class LIMBERTClassifier(LayeredIntervenableModel):
 
 
         #unstack sources
-        sources_mask = [sources_mask[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
+        sources_mask = [sources_mask[:,j,:].squeeze(1).type(torch.FloatTensor)
            for j in range(sources_mask.shape[1])]
-        sources_input = [sources_input[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
+        sources_input = [sources_input[:,j,:].squeeze(1).type(torch.FloatTensor)
            for j in range(sources_input.shape[1])]
         #translate intervention_ids to coordinates
         gets =  intervention_ids_to_coords[int(intervention_ids.flatten()[0])]
