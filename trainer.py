@@ -342,7 +342,6 @@ class LIMTrainer:
 
             for batch_num, batch in enumerate(dataloader, start=1):
                 batch = [x.to(self.device, non_blocking=True) for x in batch]
-                print(self.device)
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
                 base_labels_batch = torch.squeeze(base_labels_batch)
@@ -350,6 +349,8 @@ class LIMTrainer:
                 if iit_data is not None:
                     sources_batch, iit_labels_batch, intervention_ids_batch \
                         = self.process_IIT_batch(batch)
+                    print(sources_batch.device)
+                    print(self.device)
                     batch_iit_preds = self.model.iit_forward(
                                     base_batch,
                                     sources_batch,
