@@ -25,7 +25,7 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
     both_dataset = get_IIT_equality_dataset_both(embed_dim,
                                                 size,
                                                 token_ids =token_ids)
-    combined_dataset = ( torch.cat((V1_dataset[0],
+    combined_dataset = [torch.cat((V1_dataset[0],
                                     V2_dataset[0],
                                     both_dataset[0])),
                        torch.cat((V1_dataset[1],
@@ -42,10 +42,15 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     both_dataset[1])),
                        torch.cat((V1_dataset[4],
                                     V2_dataset[4],
-                                    both_dataset[1]))
-                       )
+                                    both_dataset[1]))]
 
-    return combined_dataset
+    if token_ids is not None:
+        combined_datset[0] = add_masks(combined_datset[0])
+        combined_datset[2] = [add_masks(X_source_train)
+                                for X_source_train in combined_datset[2]]
+
+
+    return tuple(combined_dataset)
 
 def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     train_dataset = IIT_PremackDatasetBoth(
@@ -58,7 +63,7 @@ def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
         X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
     else:
         X_base_train = totuple(X_base_train)
-        X_sources_train = [X_source_train for X_source_train in X_sources_train]
+        X_sources_train = [totuple(X_source_train) for X_source_train in X_sources_train]
     y_base_train = torch.tensor(y_base_train)
     y_IIT_train = torch.tensor(y_IIT_train)
     interventions = torch.tensor(interventions)
