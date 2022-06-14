@@ -106,10 +106,11 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.analysis_model.to(device)
         self.normal_model.to(device)
         for layer in self.labeled_layers:
-            for param in layer["model"].parameters():
-                param.to(device)
+            layer["model"].to(device)
             if "disentangle" in layer:
                 layer["disentangle"].to(device)
+            if "reentangle" in layer:
+                layer["reentangle"].to(device)
 
     def freeze_disentangling_parameters(self):
         """Freezes the orthogonal transformations used for disentangling"""
