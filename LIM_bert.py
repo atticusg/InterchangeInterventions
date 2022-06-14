@@ -191,7 +191,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
 
         def rewrap(output, stow):
             rest, original_shape = stow
-            return (X[0].reshape(original_shape), *rest)
+            return (output.reshape(original_shape), *rest)
 
 
         self.build_graph(self.model_layers, self.model_dims, unwrap, rewrap)
