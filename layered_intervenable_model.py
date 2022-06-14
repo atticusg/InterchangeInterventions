@@ -177,7 +177,7 @@ class LayeredIntervenableModel(torch.nn.Module):
     def retrieval(self, output, get):
         return output[:,get["start"]: get["end"] ]
 
-    def make_hook(self, gets, sets, layer, use_wrapper):
+    def make_hook(self, gets, sets, layer, use_wrapper=False):
         """
         Returns a function that both retrieves the output values of a module it
         is registered too according to the coordinates in `gets` and also fixes
