@@ -603,6 +603,7 @@ class LIMTrainer:
 
         # Dataset:
         base = base.float().to(device)
+        sources = [source.to(device) for source in sources]
 
         intervention_ids = intervention_ids.float().to(device)
 
@@ -615,9 +616,6 @@ class LIMTrainer:
         # Model:
         self.model.set_device(device)
         self.model.eval()
-
-        old_device = self.model.device
-        self.model.device = device
 
         preds = None
         with torch.no_grad():
