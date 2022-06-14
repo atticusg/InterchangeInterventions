@@ -331,7 +331,7 @@ class LIMTrainer:
             self.first_run = False
 
         # Make sure the model is where we want it:
-        self.model.to(self.device)
+        self.model.set_device(self.device)
 
         self.model.train()
         self.optimizer.zero_grad()
