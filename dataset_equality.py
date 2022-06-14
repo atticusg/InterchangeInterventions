@@ -7,6 +7,10 @@ from utils import randvec
 __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
+def add_masks(X):
+    mask = tuple([torch.ones(X[0].shape) for _ in range(len(X))])
+    return (X, mask)
+
 def totuple(a):
     return tuple(torch.tensor(i) for i in a)
 
