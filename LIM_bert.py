@@ -1,16 +1,12 @@
 import torch
 import copy
-from layered_intervenable_model import LayeredIntervenableModel, LinearLayer
+from layered_intervenable_model import LayeredIntervenableModel, LinearLayer, InverseLinearLayer
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
 
 class SequentialLayers(torch.nn.Module):
     def __init__(self, *args):
         super().__init__()
         self.layers = args
-        if isinstance(self.layers[1], LinearLayer):
-            self.analysis = True
-        else:
-            self.analysis = False
 
     def forward(self,
                 hidden_states,
@@ -38,12 +34,21 @@ class SequentialLayers(torch.nn.Module):
                 return_dict)
         args = self.layers[0](*args)
         count = 0
+
+        def rewrap(output, stow):
+            rest, original_shape = stow
+            return [output.reshape(original_shape), *rest]
+
+
         for layer in self.layers[1:]:
-            if self.analysis:
-                if count % 3 <= 1:
-                    args = layer(args)
-                else:
-                    args = layer(*args)
+            if isinstance(layer, LinearLayer):
+                output = args[0]
+                original_shape = copy.deepcopy(output.shape)
+                output = torch.reshape(output, (original_shape[0], -1))
+                rest = args[1:]
+                args = layer(output)
+            elif isinstance(layer, InverseLinearLayer):
+                args = (layer(args), *rest)
             else:
                 args = layer(*args)
         return args
@@ -182,19 +187,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
             self.model_dims.append(n)
         self.classifier_layer = torch.nn.Linear(self.hidden_dim, self.n_classes)
 
-        def unwrap(X):
-            output = X[0]
-            original_shape = copy.deepcopy(output.shape)
-            output = torch.reshape(output, (original_shape[0], -1))
-            rest = X[1:]
-            return output, (rest, original_shape)
-
-        def rewrap(output, stow):
-            rest, original_shape = stow
-            return output.reshape(original_shape), *rest
-
-
-        self.build_graph(self.model_layers, self.model_dims, unwrap, rewrap)
+        self.build_graph(self.model_layers, self.model_dims)
 
 
     def forward(self, pair):

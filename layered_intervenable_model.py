@@ -9,25 +9,17 @@ class InverseLinearLayer(torch.nn.Module):
 
     def forward(self, x):
         output = torch.matmul(x, self.lin_layer.weight.T)
-        if self.lin_layer.rewrap is not None:
-            return self.lin_layer.rewrap(output, self.lin_layer.stow)
         return output
 
 class LinearLayer(torch.nn.Module):
     """A linear transformation with orthogonal initialization."""
-    def __init__(self, n, device, unwrap=None, rewrap=None):
+    def __init__(self, n, device):
         super().__init__()
         self.weight = torch.nn.Parameter(
             torch.empty(n,n).to(device), requires_grad=True)
         torch.nn.init.orthogonal_(self.weight)
-        self.unwrap = unwrap
-        self.rewrap = rewrap
-        self.stow = None
 
     def forward(self, x):
-        if self.unwrap is not None:
-            input, self.stow = self.unwrap(x)
-            return torch.matmul(input, self.weight)
         return torch.matmul(x, self.weight)
 
 class LayeredIntervenableModel(torch.nn.Module):
@@ -68,7 +60,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.debug = debug
         self.combiner = torch.nn.Sequential
 
-    def build_graph(self, model_layers, model_layer_dims, unwrap=None, rewrap=None):
+    def build_graph(self, model_layers, model_layer_dims):
         self.analysis_model = torch.nn.ModuleList()
         self.normal_model = torch.nn.ModuleList()
         self.labeled_layers = []
@@ -78,9 +70,7 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.analysis_model.extend([model_layer])
             if not self.debug:
                 lin_layer = LinearLayer(model_layer_dims[index+1],
-                                        self.device,
-                                        unwrap=unwrap,
-                                        rewrap=rewrap)
+                                        self.device)
                 lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
                 inverse_lin_layer = InverseLinearLayer(lin_layer)
                 self.analysis_model.extend([lin_layer, inverse_lin_layer])
