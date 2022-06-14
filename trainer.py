@@ -877,12 +877,10 @@ class BERTLIMTrainer(LIMTrainer):
             input_sources = []
             mask_sources = []
             for input_source, mask_source in sources:
-                input_sources.append(torch.stack(
-                                    input_source, dim=0).to(device))
-                mask_sources.append(torch.stack(
-                                    mask_source, dim=0).to(device))
-            input_sources = torch.stack(input_sources, dim=1)
-            mask_sources = torch.stack(mask_sources, dim=1)
+                input_sources.append(torch.stack(input_source, dim=0))
+                mask_sources.append(torch.stack(mask_source, dim=0))
+            input_sources = torch.stack(input_sources, dim=1).to(device)
+            mask_sources = torch.stack(mask_sources, dim=1).to(device)
 
 
         intervention_ids = intervention_ids.float().to(device)
@@ -894,9 +892,6 @@ class BERTLIMTrainer(LIMTrainer):
         # Model:
         self.model.set_device(device)
         self.model.eval()
-
-        old_device = self.model.device
-        self.model.device = device
 
         with torch.no_grad():
             preds = self.model.iit_forward((input_base, mask_base),
