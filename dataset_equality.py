@@ -48,6 +48,7 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     V2_dataset[4],
                                     both_dataset[1]))]
 
+    print("1",len(combined_dataset))
     if token_ids is not None:
         combined_dataset[0] = totuple(combined_dataset[0])
         combined_dataset.insert(1,get_mask(combined_dataset[0]))
@@ -55,7 +56,7 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                 for X_source_train in combined_dataset[3]]
         combined_dataset.insert(4,[get_mask(X_source_train)
                                 for X_source_train in combined_dataset[3]])
-
+    print("2", len(combined_dataset))
     return combined_dataset
 
 def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
