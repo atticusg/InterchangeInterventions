@@ -102,9 +102,11 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.unfreeze_model_parameters()
 
     def set_device(self, device):
-        self.bert.to(device)
+        self.to(device)
         self.analysis_model.to(device)
         self.normal_model.to(device)
+        if hasattr(self, "bert"):
+            self.bert.to(device)
 
     def freeze_disentangling_parameters(self):
         """Freezes the orthogonal transformations used for disentangling"""
