@@ -7,9 +7,9 @@ from utils import randvec
 __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
-def add_masks(X):
+def get_mask(X):
     mask = tuple([torch.ones(X[0].shape) for _ in range(len(X))])
-    return (X, mask)
+    return mask
 
 def totuple(a):
     return tuple(torch.tensor(i) for i in a)
@@ -49,9 +49,12 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     both_dataset[1]))]
 
     if token_ids is not None:
-        combined_dataset[0] = add_masks(totuple(combined_dataset[0]))
-        combined_dataset[2] = [add_masks(totuple(X_source_train))
-                                for X_source_train in combined_dataset[2]]
+        combined_dataset[0] = totuple(combined_dataset[0])
+        combined_dataset.insert(get_mask(combined_dataset[0]))
+        combined_dataset[3] = [totuple(X_source_train)
+                                for X_source_train in combined_dataset[3]]
+        combined_dataset.insert([get_mask(X_source_train)
+                                for X_source_train in combined_dataset[3]], 4)
 
     return tuple(combined_dataset)
 
