@@ -56,7 +56,8 @@ class LayeredIntervenableModel(torch.nn.Module):
             three times the length of `labeled_layers`
         """
         super().__init__()
-        self.device = device
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device(device)
         self.debug = debug
         self.combiner = torch.nn.Sequential
         self.use_wrapper = use_wrapper
