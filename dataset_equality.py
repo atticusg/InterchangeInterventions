@@ -12,7 +12,7 @@ def get_mask(X):
     return mask
 
 def totuple(X):
-    return tuple([X[i,:] for i in range(X.shape[0])])
+    return (X[i,:] for i in range(X.shape[0]))
 
 def rand_token_id(token_ids):
     return random.choice(token_ids)
