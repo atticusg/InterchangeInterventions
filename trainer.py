@@ -335,6 +335,7 @@ class LIMTrainer:
 
         self.model.train()
         self.optimizer.zero_grad()
+        print("fit dev", self.device)
 
         for iteration in range(1, self.max_iter+1):
 
@@ -342,7 +343,6 @@ class LIMTrainer:
 
             for batch_num, batch in enumerate(dataloader, start=1):
                 batch = [x.to(self.device) for x in batch]
-                print(self.device)
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
                 base_labels_batch = torch.squeeze(base_labels_batch)
