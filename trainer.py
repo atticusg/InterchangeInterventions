@@ -726,7 +726,6 @@ class BERTLIMTrainer(LIMTrainer):
 
     def build_dataset(self, base_x, base_y):
 
-        base_y = torch.tensor(base_y)
         input, mask = base_x
         input = torch.stack(input)
         mask = torch.stack(mask)
