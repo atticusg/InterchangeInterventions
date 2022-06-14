@@ -23,7 +23,7 @@ class LinearLayer(torch.nn.Module):
         return torch.matmul(x, self.weight)
 
 class LayeredIntervenableModel(torch.nn.Module):
-    def __init__(self, device=None,debug=False):
+    def __init__(self, device=None, debug=False, use_wrapper=False):
         """
 
         Base class for all the PyTorch-based models.
@@ -59,6 +59,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.device = device
         self.debug = debug
         self.combiner = torch.nn.Sequential
+        self.use_wrapper = use_wrapper
 
     def build_graph(self, model_layers, model_layer_dims):
         self.analysis_model = torch.nn.ModuleList()
@@ -169,6 +170,12 @@ class LayeredIntervenableModel(torch.nn.Module):
             handler.remove()
         return counterfactual_logits
 
+    def intervention_wrapper(self, output, set):
+        raise "Not Imlemented Error"
+
+    def retrieval_wrapper(self, output, set):
+        raise "Not Imlemented Error"
+
     def intervention(self, output, set):
         return torch.cat([output[:,:set["start"]], set["intervention"],
                             output[:,set["end"]:]],
@@ -177,7 +184,7 @@ class LayeredIntervenableModel(torch.nn.Module):
     def retrieval(self, output, get):
         return output[:,get["start"]: get["end"] ]
 
-    def make_hook(self, gets, sets, layer, use_wrapper=False):
+    def make_hook(self, gets, sets, layer):
         """
         Returns a function that both retrieves the output values of a module it
         is registered too according to the coordinates in `gets` and also fixes
@@ -191,7 +198,7 @@ class LayeredIntervenableModel(torch.nn.Module):
                     if layer == get["layer"]:
                         layer_gets.append(get)
             for get in layer_gets:
-                if use_wrapper:
+                if self.use_wrapper:
                     self.activation[f'{get["layer"]}-{get["start"]}-{get["end"]}']\
                         = self.retrieval_wrapper(output, get)
                 else:
@@ -203,7 +210,7 @@ class LayeredIntervenableModel(torch.nn.Module):
                     if layer == set["layer"]:
                         layer_sets.append(set)
             for set in layer_sets:
-                if use_wrapper:
+                if self.use_wrapper:
                     output = self.intervention_wrapper(output, set)
                 else:
                     output = self.intervention(output, set)
