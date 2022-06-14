@@ -184,7 +184,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
 
         def unwrap(X):
             output = X[0]
-            original_shape = copy.deepcopy(output.shape())
+            original_shape = copy.deepcopy(output.shape)
             output = torch.reshape(output, (original_shape[0], -1))
             rest = X[1:]
             return output, (rest, original_shape)
