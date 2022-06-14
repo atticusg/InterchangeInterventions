@@ -341,7 +341,6 @@ class LIMTrainer:
             epoch_error = 0.0
 
             for batch_num, batch in enumerate(dataloader, start=1):
-
                 batch = [x.to(self.device, non_blocking=True) for x in batch]
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
