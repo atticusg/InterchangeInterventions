@@ -35,10 +35,6 @@ class SequentialLayers(torch.nn.Module):
         args = self.layers[0](*args)
         count = 0
 
-        def rewrap(output, stow):
-            rest, original_shape = stow
-            return [output.reshape(original_shape), *rest]
-
 
         for layer in self.layers[1:]:
             if isinstance(layer, LinearLayer):
@@ -244,16 +240,3 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         for handler in handlers:
             handler.remove()
         return counterfactual_logits
-
-    def intervention_wrapper(self,output, set):
-        original_shape = copy.deepcopy(output[0].shape)
-        reps = output[0].reshape((original_shape[0], -1))
-        reps = torch.cat([reps[:,:set["start"]], set["intervention"],
-                            reps[:,set["end"]:]],
-                            dim = 1)
-        return tuple([reps.reshape(original_shape)]\
-                                + [ _ for _ in output[1:]])
-
-    def retrieval_wrapper(self, output, get):
-        reps = output[0].reshape((output[0].shape[0], -1))
-        return reps[:,get["start"]: get["end"] ]
