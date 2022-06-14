@@ -8,11 +8,12 @@ __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
 def get_mask(X):
+    print(X)
     mask = tuple([torch.ones(X[0].shape) for _ in range(len(X))])
     return mask
 
 def totuple(X):
-    return (X[i,:] for i in range(X.shape[0]))
+    return tuple([X[i,:].flatten() for i in range(X.shape[0])])
 
 def rand_token_id(token_ids):
     return random.choice(token_ids)
