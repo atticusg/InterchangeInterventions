@@ -236,7 +236,12 @@ class LIMTrainer:
     def process_IIT_batch(self,batch):
         return batch[2], batch[3], batch[4]
 
-    def fit(self, base, base_labels, iit_data=None, intervention_ids_to_coords=None):
+    def fit(self,
+             base,
+             base_labels,
+             iit_data=None,
+             intervention_ids_to_coords=None,
+             device=None):
         """
         Generic optimization method.
 
