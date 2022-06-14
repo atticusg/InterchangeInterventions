@@ -102,6 +102,7 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.unfreeze_model_parameters()
 
     def set_device(self, device):
+        self.to(device)
         for layer in self.labeled_layers:
             for param in layer["model"].parameters():
                 param.to(device)
