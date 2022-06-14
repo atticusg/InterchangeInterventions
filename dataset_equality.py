@@ -8,7 +8,7 @@ __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
 def get_mask(X):
-    print(X)
+    print(X, "\n")
     mask = tuple([torch.ones(X[0].shape) for _ in range(len(X))])
     return mask
 
