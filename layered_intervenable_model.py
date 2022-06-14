@@ -163,6 +163,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         for i, get in enumerate(gets):
             handlers = self._gets_sets(gets =[get],sets = None)
             print(sources[i].device)
+            print(self.device)
             source_logits = self.forward(sources[i])
             for handler in handlers:
                 handler.remove()
