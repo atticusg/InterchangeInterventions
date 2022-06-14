@@ -613,7 +613,7 @@ class LIMTrainer:
         dataloader = self._build_dataloader(dataset, shuffle=False)
 
         # Model:
-        self.model.to(device)
+        self.model.set_device(device)
         self.model.eval()
 
         old_device = self.model.device
@@ -812,6 +812,7 @@ class BERTLIMTrainer(LIMTrainer):
         mask = torch.stack(mask, dim=0).to(device)
 
         # Model:
+        print(device)
         self.model.set_device(device)
         self.model.eval()
 
