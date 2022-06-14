@@ -154,7 +154,6 @@ class LIMTrainer:
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            print(device)
         self.device = torch.device(device)
         self.display_progress = display_progress
         self.optimizer_kwargs = optimizer_kwargs
@@ -769,14 +768,6 @@ class BERTLIMTrainer(LIMTrainer):
 
         intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
-        print(base_input.shape,
-                base_mask.shape,
-                base_y.shape,
-                sources_input.shape,
-                sources_mask.shape,
-                IIT_y.shape,
-                intervention_ids.shape)
-
         dataset = torch.utils.data.TensorDataset(base_input,
                                                 base_mask,
                                                 base_y,
@@ -821,16 +812,14 @@ class BERTLIMTrainer(LIMTrainer):
         mask = torch.stack(mask, dim=0).to(device)
 
         # Model:
-        self.model.to(device)
-        self.model.bert.to(device)
+        self.model.set_device(device)
         self.model.eval()
 
         with torch.no_grad():
             preds = self.model((input, mask))
 
         # Make sure the model is back on the instance device:
-        self.model.to(self.device)
-        self.model.bert.to(self.device)
+        self.model.set_device(device)
         return preds.argmax(axis=1)
 
 

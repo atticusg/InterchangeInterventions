@@ -197,7 +197,6 @@ class LIMBERTClassifier(LayeredIntervenableModel):
             self.bert.encoder = self.analysis_model
         else:
             self.bert.encoder =  self.normal_model
-        print(self.device)
         self.bert.to(self.device)
         output = self.bert(X, mask).pooler_output
         output = self.classifier_layer(output)
