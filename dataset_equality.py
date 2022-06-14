@@ -29,7 +29,7 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     V2_dataset[0],
                                     both_dataset[0])),
                        torch.cat((V1_dataset[1],
-                                    V2_dataset[1]
+                                    V2_dataset[1],
                                     both_dataset[1])),
                        [torch.cat((V1_dataset[2][0],
                                     V2_dataset[2][0],
