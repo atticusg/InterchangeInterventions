@@ -153,7 +153,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         """
         #unstack sources
         print(sources.device)
-        sources = [sources[:,j,:].squeeze(1).type(torch.FloatTensor)
+        sources = [sources[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
            for j in range(sources.shape[1])]
         #translate intervention_ids to coordinates
         gets =  intervention_ids_to_coords[int(intervention_ids.flatten()[0])]
