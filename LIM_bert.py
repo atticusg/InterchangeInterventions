@@ -1,12 +1,16 @@
 import torch
 import copy
-from layered_intervenable_model import LayeredIntervenableModel
+from layered_intervenable_model import LayeredIntervenableModel, LinearLayer
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
 
 class SequentialLayers(torch.nn.Module):
     def __init__(self, *args):
         super().__init__()
         self.layers = args
+        if isinstance(layers[1],LinearLayer):
+            self.analysis = True
+        else:
+            self.analysis = False
 
     def forward(self,
                 hidden_states,
@@ -33,8 +37,15 @@ class SequentialLayers(torch.nn.Module):
                 output_hidden_states,
                 return_dict)
         args = self.layers[0](*args)
+        count = 0
         for layer in self.layers[1:]:
-            args = layer(*args)
+            if self.analysis:
+                if count % 3 <= 1:
+                    args = layer(args)
+                else:
+                    args = layer(*args)
+            else:
+                args = layer(*args)
         return args
 
 
