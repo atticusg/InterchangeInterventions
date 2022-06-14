@@ -50,7 +50,7 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
 
     if token_ids is not None:
         combined_dataset[0] = totuple(combined_dataset[0])
-        combined_dataset.insert(get_mask(combined_dataset[0]))
+        combined_dataset.insert(get_mask(combined_dataset[0]), 1)
         combined_dataset[3] = [totuple(X_source_train)
                                 for X_source_train in combined_dataset[3]]
         combined_dataset.insert([get_mask(X_source_train)
