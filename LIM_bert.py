@@ -48,7 +48,7 @@ class SequentialLayers(torch.nn.Module):
                 rest = args[1:]
                 args = layer(output)
             elif isinstance(layer, InverseLinearLayer):
-                args = (layer(args), *rest)
+                args = (layer(args).reshape(original_shape), *rest)
             else:
                 args = layer(*args)
         return args
@@ -179,6 +179,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         self.bert.train()
         self.hidden_dim = self.bert.embeddings.word_embeddings.embedding_dim
         n = self.hidden_dim*max_length
+
 
         self.model_dims = [n]
         self.model_layers = torch.nn.ModuleList()
