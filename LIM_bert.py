@@ -7,7 +7,7 @@ class SequentialLayers(torch.nn.Module):
     def __init__(self, *args):
         super().__init__()
         self.layers = args
-        if isinstance(layers[1],LinearLayer):
+        if isinstance(self.layers[1], LinearLayer):
             self.analysis = True
         else:
             self.analysis = False
