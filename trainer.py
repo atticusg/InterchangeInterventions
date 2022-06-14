@@ -883,7 +883,7 @@ class BERTLIMTrainer(LIMTrainer):
             mask_sources = torch.stack(mask_sources, dim=1)
 
 
-        intervention_ids = torch.Tensor(intervention_ids).float().to(device)
+        intervention_ids = torch.Tensor(intervention_ids, dtype=torch.int64).float().to(device)
 
         base_labels = [ 0 for _ in range(input_base.shape[0])]
         iit_labels = [ 0 for _ in range(input_base.shape[0])]
