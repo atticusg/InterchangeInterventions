@@ -13,10 +13,10 @@ class InverseLinearLayer(torch.nn.Module):
 
 class LinearLayer(torch.nn.Module):
     """A linear transformation with orthogonal initialization."""
-    def __init__(self, n, device):
+    def __init__(self, n):
         super().__init__()
         self.weight = torch.nn.Parameter(
-            torch.empty(n,n).to(device), requires_grad=True)
+            torch.empty(n,n), requires_grad=True)
         torch.nn.init.orthogonal_(self.weight)
 
     def forward(self, x):
@@ -56,10 +56,6 @@ class LayeredIntervenableModel(torch.nn.Module):
             three times the length of `labeled_layers`
         """
         super().__init__()
-        if device is None:
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            print(device)
-        self.device = torch.device(device)
         self.debug = debug
         self.combiner = torch.nn.Sequential
         self.use_wrapper = use_wrapper
@@ -73,8 +69,7 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.normal_model.append(model_layer)
             self.analysis_model.extend([model_layer])
             if not self.debug:
-                lin_layer = LinearLayer(model_layer_dims[index+1],
-                                        self.device)
+                lin_layer = LinearLayer(model_layer_dims[index+1])
                 lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
                 inverse_lin_layer = InverseLinearLayer(lin_layer)
                 self.analysis_model.extend([lin_layer, inverse_lin_layer])
