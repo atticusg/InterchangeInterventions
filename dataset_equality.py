@@ -25,7 +25,7 @@ def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
         X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
     else:
         X_base_train = totuple(X_base_train)
-        X_sources_train = [totuple(X_source_train) for X_source_train in X_sources_train]
+        X_sources_train = [X_source_train for X_source_train in X_sources_train]
     y_base_train = torch.tensor(y_base_train)
     y_IIT_train = torch.tensor(y_IIT_train)
     interventions = torch.tensor(interventions)
