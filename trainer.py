@@ -806,7 +806,6 @@ class BERTLIMTrainer(LIMTrainer):
 
         """
         device = self.device if device is None else torch.device(device)
-        print(device)
 
         # Dataset:
         input, mask = X_base
