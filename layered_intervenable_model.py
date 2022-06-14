@@ -152,6 +152,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         integers to coordinates denoting the layer, start index, and end index.
         """
         #unstack sources
+        print(sources.device)
         sources = [sources[:,j,:].squeeze(1).type(torch.FloatTensor)
            for j in range(sources.shape[1])]
         #translate intervention_ids to coordinates
