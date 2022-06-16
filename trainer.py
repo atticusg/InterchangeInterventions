@@ -741,14 +741,11 @@ class BERTLIMTrainer(LIMTrainer):
 
     def build_iit_dataset(self, base, base_y, iit_data):
 
-        base_y = torch.tensor(base_y)
         base_input, base_mask = base
         base_input = torch.stack(base_input)
         base_mask = torch.stack(base_mask)
 
         sources, IIT_y, intervention_ids = iit_data
-
-        IIT_y = torch.tensor(IIT_y)
 
         if len(sources) == 1:
             sources_input, sources_mask = sources
