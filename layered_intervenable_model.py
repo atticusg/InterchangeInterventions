@@ -113,13 +113,12 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.bert.to(device)
         for layer in self.labeled_layers:
             if "disentangle" in layer:
-                print("hello")
                 layer["disentangle"].set_device(device)
 
-    def freeze_disentangling_parameters(self):
+    def freeze_disentangling_parameters(self, layer_num=None):
         """Freezes the orthogonal transformations used for disentangling"""
-        for layer in self.labeled_layers:
-            if "disentangle" in layer:
+        for i, layer in enumerate(self.labeled_layers):
+            if "disentangle" in layer and (layer_num is None or layer_num == i):
                 layer["disentangle"].parametrizations.weight.original.requires_grad = False
                 layer["disentangle"].parametrizations.weight.original.grad = None
 
@@ -130,10 +129,10 @@ class LayeredIntervenableModel(torch.nn.Module):
                 param.requires_grad = False
                 param.grad = None
 
-    def unfreeze_disentangling_parameters(self):
+    def unfreeze_disentangling_parameters(self, layer_num=None):
         """Unfreezes the orthogonal transformations used for disentangling"""
-        for layer in self.labeled_layers:
-            if "disentangle" in layer:
+        for i, layer in enumerate(self.labeled_layers):
+            if "disentangle" in layer and (layer_num is None or layer_num == i):
                 layer["disentangle"].parametrizations.weight.original.requires_grad = True
 
     def unfreeze_model_parameters(self):
