@@ -426,20 +426,18 @@ class IIT_PremackDatasetControl:
                 (
                     np.array(x1 + x2),
                     np.array(x3 + x4),
-                    np.array(x5 + x6),
                     base_label, IIT_label, intervention
                 )
-                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+                for (x1, x2, x3, x4), base_label, IIT_label, intervention in data
             ]
         else:
             data = [
                 (
                     np.concatenate(x1 + x2),
                     np.concatenate(x3 + x4),
-                    np.concatenate(x5 + x6),
                     base_label, IIT_label, intervention
                 )
-                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+                for (x1, x2, x3, x4), base_label, IIT_label, intervention in data
             ]
         base, source, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
