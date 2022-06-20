@@ -414,7 +414,7 @@ class IIT_PremackDatasetControl:
             data = self._create_control2()
         elif key["left"] == (0,1) and key["right"] == (0,1):
             data = self._create_control4()
-        elif key["left"] == (,) or key["left"] == (,):
+        elif key["left"] == () or key["left"] == ():
             data = self._create_control1()
         else:
             data = self._create_control3()
@@ -461,7 +461,7 @@ class IIT_PremackDatasetControl:
             else:
                 base_label = self.NEG_LABEL
 
-            if key["left"] != (,) and random.choice([True,False]):
+            if key["left"] != () and random.choice([True,False]):
                 source_left = self._create_random_pair()
                 if key["left"] == 0:
                     source_left = (copy.deepcopy(base_left[1]), source_left[1])
@@ -470,7 +470,7 @@ class IIT_PremackDatasetControl:
             else:
                 source_left = self._create_random_pair()
 
-            if key["right"] != (,) and random.choice([True,False]):
+            if key["right"] != () and random.choice([True,False]):
                 source_right = self._create_random_pair()
                 if key["right"] == 0:
                     source_right = (copy.deepcopy(base_right[1]),
@@ -483,14 +483,14 @@ class IIT_PremackDatasetControl:
 
             rep = (base_left, base_right, source_left, source_right)
 
-            if key["left"] == (,):
+            if key["left"] == ():
                 left_value = (base_left[0] == base_left[0]).all()
             else:
                 left_ind1 = key["left"]
                 left_ind2 = int( not key["left"])
                 left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
 
-            if key["right"] == (,):
+            if key["right"] == ():
                 right_value = (base_right[0] == base_right[0]).all()
             else:
                 right_ind1 = key["right"]
