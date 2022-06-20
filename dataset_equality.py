@@ -72,8 +72,8 @@ def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
 
 def get_IIT_equality_dataset_control(key, embed_dim, size, token_ids =None):
     class_size = size/2
-    train_dataset = IIT_PremackDatasetControl(,
-        key=key
+    train_dataset = IIT_PremackDatasetControl(
+        key=key,
         embed_dim=embed_dim,
         n_pos=class_size,
         n_neg=class_size,
