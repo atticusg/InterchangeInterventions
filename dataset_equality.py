@@ -415,7 +415,7 @@ class IIT_PremackDatasetControl:
             data = self._create_control2()
         elif self.key["left"] == (0,1) and self.key["right"] == (0,1):
             data = self._create_control4()
-        elif self.key["left"] == () or self.key["left"] == ():
+        elif self.key["left"] == () or self.key["right"] == ():
             data = self._create_control1()
         else:
             data = self._create_control3()
