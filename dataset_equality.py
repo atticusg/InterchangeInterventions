@@ -382,13 +382,14 @@ class IIT_PremackDatasetControl:
     NEG_LABEL = 0
 
     def __init__(self,
-                key="AC",
+                key={"left":0, "right":0},
                 embed_dim=50,
                 n_pos=500,
                 n_neg=500,
                 intermediate=False,
                 token_ids = None):
 
+        self.key = key
         if token_ids is None:
             self.bert = False
         else:
@@ -410,11 +411,11 @@ class IIT_PremackDatasetControl:
         self.intermediate = intermediate
 
     def create(self):
-        if key["left"] in [0,1] and key["right"] in [0,1]:
+        if self.self.key["left"] in [0,1] and self.key["right"] in [0,1]:
             data = self._create_control2()
-        elif key["left"] == (0,1) and key["right"] == (0,1):
+        elif self.key["left"] == (0,1) and self.key["right"] == (0,1):
             data = self._create_control4()
-        elif key["left"] == () or key["left"] == ():
+        elif self.key["left"] == () or self.key["left"] == ():
             data = self._create_control1()
         else:
             data = self._create_control3()
@@ -461,18 +462,18 @@ class IIT_PremackDatasetControl:
             else:
                 base_label = self.NEG_LABEL
 
-            if key["left"] != () and random.choice([True,False]):
+            if self.key["left"] != () and random.choice([True,False]):
                 source_left = self._create_random_pair()
-                if key["left"] == 0:
+                if self.key["left"] == 0:
                     source_left = (copy.deepcopy(base_left[1]), source_left[1])
                 else:
                     source_left = (source_left[0],copy.deepcopy(base_left[0]))
             else:
                 source_left = self._create_random_pair()
 
-            if key["right"] != () and random.choice([True,False]):
+            if self.key["right"] != () and random.choice([True,False]):
                 source_right = self._create_random_pair()
-                if key["right"] == 0:
+                if self.key["right"] == 0:
                     source_right = (copy.deepcopy(base_right[1]),
                                     source_right[1])
                 else:
@@ -483,18 +484,18 @@ class IIT_PremackDatasetControl:
 
             rep = (base_left, base_right, source_left, source_right)
 
-            if key["left"] == ():
+            if self.key["left"] == ():
                 left_value = (base_left[0] == base_left[0]).all()
             else:
-                left_ind1 = key["left"]
-                left_ind2 = int( not key["left"])
+                left_ind1 = self.key["left"]
+                left_ind2 = int( not self.key["left"])
                 left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
 
-            if key["right"] == ():
+            if self.key["right"] == ():
                 right_value = (base_right[0] == base_right[0]).all()
             else:
-                right_ind1 = key["right"]
-                right_ind2 = int( not key["right"])
+                right_ind1 = self.key["right"]
+                right_ind2 = int( not self.key["right"])
                 right_value = (source_right[right_ind1] == base_right[right_ind2]).all()
 
 
@@ -519,7 +520,7 @@ class IIT_PremackDatasetControl:
 
             if random.choice([True,False]):
                 source_left = self._create_random_pair()
-                if key["left"] == 0:
+                if self.key["left"] == 0:
                     source_left = (copy.deepcopy(base_left[1]), source_left[1])
                 else:
                     source_left = (source_left[0],copy.deepcopy(base_left[0]))
@@ -528,7 +529,7 @@ class IIT_PremackDatasetControl:
 
             if random.choice([True,False]):
                 source_right = self._create_random_pair()
-                if key["right"] == 0:
+                if self.key["right"] == 0:
                     source_right = (copy.deepcopy(base_right[1]),
                                     source_right[1])
                 else:
@@ -539,11 +540,11 @@ class IIT_PremackDatasetControl:
 
             rep = (base_left, base_right, source_left, source_right)
 
-            left_ind1 = key["left"]
-            left_ind2 = int( not key["left"])
+            left_ind1 = self.key["left"]
+            left_ind2 = int( not self.key["left"])
 
-            right_ind1 = key["right"]
-            right_ind2 = int( not key["right"])
+            right_ind1 = self.key["right"]
+            right_ind2 = int( not self.key["right"])
 
             if (source_left[left_ind1] == base_left[left_ind2]).all() == \
                 (source_right[right_ind1] == base_right[right_ind2]).all():
@@ -565,18 +566,18 @@ class IIT_PremackDatasetControl:
             else:
                 base_label = self.NEG_LABEL
 
-            if key["left"] != (0,1) and random.choice([True,False]):
+            if self.key["left"] != (0,1) and random.choice([True,False]):
                 source_left = self._create_random_pair()
-                if key["left"] == 0:
+                if self.key["left"] == 0:
                     source_left = (copy.deepcopy(base_left[1]), source_left[1])
                 else:
                     source_left = (source_left[0],copy.deepcopy(base_left[0]))
             else:
                 source_left = self._create_random_pair()
 
-            if key["right"] != (0,1) and random.choice([True,False]):
+            if self.key["right"] != (0,1) and random.choice([True,False]):
                 source_right = self._create_random_pair()
-                if key["right"] == 0:
+                if self.key["right"] == 0:
                     source_right = (copy.deepcopy(base_right[1]),
                                     source_right[1])
                 else:
@@ -587,18 +588,18 @@ class IIT_PremackDatasetControl:
 
             rep = (base_left, base_right, source_left, source_right)
 
-            if key["left"] == (0,1):
+            if self.key["left"] == (0,1):
                 left_value = (source_left[0] == source_left[0]).all()
             else:
-                left_ind1 = key["left"]
-                left_ind2 = int( not key["left"])
+                left_ind1 = self.key["left"]
+                left_ind2 = int( not self.key["left"])
                 left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
 
-            if key["right"] == (0,1):
+            if self.key["right"] == (0,1):
                 right_value = (source_right[0] == source_right[0]).all()
             else:
-                right_ind1 = key["right"]
-                right_ind2 = int( not key["right"])
+                right_ind1 = self.key["right"]
+                right_ind2 = int( not self.key["right"])
                 right_value = (source_right[right_ind1] == base_right[right_ind2]).all()
 
 
