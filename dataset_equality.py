@@ -43,10 +43,10 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     both_dataset[2][1]))],
                        torch.cat((V1_dataset[3],
                                     V2_dataset[3],
-                                    both_dataset[1])),
+                                    both_dataset[3])),
                        torch.cat((V1_dataset[4],
                                     V2_dataset[4],
-                                    both_dataset[1]))]
+                                    both_dataset[4]))]
 
     if token_ids is not None:
         combined_dataset[0] = totuple(combined_dataset[0])
