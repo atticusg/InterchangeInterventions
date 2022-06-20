@@ -70,9 +70,10 @@ def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     interventions = torch.tensor(interventions)
     return X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions
 
-def get_IIT_equality_dataset_control13(embed_dim, size, token_ids =None):
+def get_IIT_equality_dataset_control(key, embed_dim, size, token_ids =None):
     class_size = size/2
-    train_dataset = IIT_PremackDatasetControl13(
+    train_dataset = IIT_PremackDatasetControl(,
+        key=key
         embed_dim=embed_dim,
         n_pos=class_size,
         n_neg=class_size,
@@ -373,14 +374,15 @@ class IIT_PremackDataset:
             assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
 
-class IIT_PremackDatasetControl13:
+class IIT_PremackDatasetControl:
     V1 = 0
     V2 = 1
-    control13 = 3
+    control = 3
     POS_LABEL = 1
     NEG_LABEL = 0
 
     def __init__(self,
+                key="AC",
                 embed_dim=50,
                 n_pos=500,
                 n_neg=500,
@@ -408,7 +410,14 @@ class IIT_PremackDatasetControl13:
         self.intermediate = intermediate
 
     def create(self):
-        data = self._create_control13(self.size)
+        if key["left"] in [0,1] and key["right"] in [0,1]:
+            data = self._create_control2()
+        elif key["left"] == (0,1) and key["right"] == (0,1):
+            data = self._create_control4()
+        elif key["left"] == (,) or key["left"] == (,):
+            data = self._create_control1()
+        else:
+            data = self._create_control3()
         random.shuffle(data)
         data = data.copy()
         if self.bert:
@@ -441,12 +450,68 @@ class IIT_PremackDatasetControl13:
         self.sources.append(self.source)
         return self.base, self.y, self.sources, self.IIT_y, self.interventions
 
-    def _create_control13(self, size):
+    def _create_control1(self):
         data = []
-        for _ in range(int(size)):
+        for _ in range(int(self.size)):
             base_left = self._create_random_pair()
             base_right = self._create_random_pair()
-            intervention = self.control13
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            if key["left"] != (,) and random.choice([True,False]):
+                source_left = self._create_random_pair()
+                if key["left"] == 0:
+                    source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                else:
+                    source_left = (source_left[0],copy.deepcopy(base_left[0]))
+            else:
+                source_left = self._create_random_pair()
+
+            if key["right"] != (,) and random.choice([True,False]):
+                source_right = self._create_random_pair()
+                if key["right"] == 0:
+                    source_right = (copy.deepcopy(base_right[1]),
+                                    source_right[1])
+                else:
+                    source_right= (source_right[0],
+                                    copy.deepcopy(base_right[0]))
+            else:
+                source_right = self._create_random_pair()
+
+            rep = (base_left, base_right, source_left, source_right)
+
+            if key["left"] == (,):
+                left_value = (base_left[0] == base_left[0]).all()
+            else:
+                left_ind1 = key["left"]
+                left_ind2 = int( not key["left"])
+                left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
+
+            if key["right"] == (,):
+                right_value = (base_right[0] == base_right[0]).all()
+            else:
+                right_ind1 = key["right"]
+                right_ind2 = int( not key["right"])
+                right_value = (source_right[right_ind1] == base_right[right_ind2]).all()
+
+
+            if left_value == right_value:
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+
+    def _create_control2(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
             if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
                 base_label = self.POS_LABEL
             else:
@@ -454,22 +519,115 @@ class IIT_PremackDatasetControl13:
 
             if random.choice([True,False]):
                 source_left = self._create_random_pair()
-                source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                if key["left"] == 0:
+                    source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                else:
+                    source_left = (source_left[0],copy.deepcopy(base_left[0]))
             else:
                 source_left = self._create_random_pair()
 
             if random.choice([True,False]):
                 source_right = self._create_random_pair()
-                source_right = (copy.deepcopy(base_right[1]), source_right[1])
+                if key["right"] == 0:
+                    source_right = (copy.deepcopy(base_right[1]),
+                                    source_right[1])
+                else:
+                    source_right= (source_right[0],
+                                    copy.deepcopy(base_right[0]))
             else:
                 source_right = self._create_random_pair()
 
             rep = (base_left, base_right, source_left, source_right)
 
-            if (source_left[0] == base_left[1]).all() == (source_right[0] == base_right[1]).all():
+            left_ind1 = key["left"]
+            left_ind2 = int( not key["left"])
+
+            right_ind1 = key["right"]
+            right_ind2 = int( not key["right"])
+
+            if (source_left[left_ind1] == base_left[left_ind2]).all() == \
+                (source_right[right_ind1] == base_right[right_ind2]).all():
                 IIT_label = self.POS_LABEL
             else:
                 IIT_label = self.NEG_LABEL
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+
+    def _create_control3(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            if key["left"] != (0,1) and random.choice([True,False]):
+                source_left = self._create_random_pair()
+                if key["left"] == 0:
+                    source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                else:
+                    source_left = (source_left[0],copy.deepcopy(base_left[0]))
+            else:
+                source_left = self._create_random_pair()
+
+            if key["right"] != (0,1) and random.choice([True,False]):
+                source_right = self._create_random_pair()
+                if key["right"] == 0:
+                    source_right = (copy.deepcopy(base_right[1]),
+                                    source_right[1])
+                else:
+                    source_right= (source_right[0],
+                                    copy.deepcopy(base_right[0]))
+            else:
+                source_right = self._create_random_pair()
+
+            rep = (base_left, base_right, source_left, source_right)
+
+            if key["left"] == (0,1):
+                left_value = (source_left[0] == source_left[0]).all()
+            else:
+                left_ind1 = key["left"]
+                left_ind2 = int( not key["left"])
+                left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
+
+            if key["right"] == (0,1):
+                right_value = (source_right[0] == source_right[0]).all()
+            else:
+                right_ind1 = key["right"]
+                right_ind2 = int( not key["right"])
+                right_value = (source_right[right_ind1] == base_right[right_ind2]).all()
+
+
+            if left_value == right_value:
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+
+    def _create_control4(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            source_left = self._create_random_pair()
+            source_right = self._create_random_pair()
+            if (source_left[0] == source_left[1]).all() == (source_right[0] == source_right[1]).all():
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+            rep = (base_left, base_right, source_left, source_right)
 
             data.append((rep, base_label, IIT_label, intervention))
         return data
