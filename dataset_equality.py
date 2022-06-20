@@ -483,14 +483,14 @@ class IIT_PremackDatasetControl:
             rep = (base_left, base_right, source_left, source_right)
 
             if self.key["left"] == ():
-                left_value = (base_left[0] == base_left[0]).all()
+                left_value = (base_left[0] == base_left[1]).all()
             else:
                 left_ind1 = self.key["left"]
                 left_ind2 = int( not self.key["left"])
                 left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
 
             if self.key["right"] == ():
-                right_value = (base_right[0] == base_right[0]).all()
+                right_value = (base_right[0] == base_right[1]).all()
             else:
                 right_ind1 = self.key["right"]
                 right_ind2 = int( not self.key["right"])
@@ -587,14 +587,14 @@ class IIT_PremackDatasetControl:
             rep = (base_left, base_right, source_left, source_right)
 
             if self.key["left"] == (0,1):
-                left_value = (source_left[0] == source_left[0]).all()
+                left_value = (source_left[0] == source_left[1]).all()
             else:
                 left_ind1 = self.key["left"]
                 left_ind2 = int( not self.key["left"])
                 left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
 
             if self.key["right"] == (0,1):
-                right_value = (source_right[0] == source_right[0]).all()
+                right_value = (source_right[0] == source_right[1]).all()
             else:
                 right_ind1 = self.key["right"]
                 right_ind2 = int( not self.key["right"])
