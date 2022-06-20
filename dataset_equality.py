@@ -411,7 +411,7 @@ class IIT_PremackDatasetControl:
         self.intermediate = intermediate
 
     def create(self):
-        if self.self.key["left"] in [0,1] and self.key["right"] in [0,1]:
+        if self.key["left"] in [0,1] and self.key["right"] in [0,1]:
             data = self._create_control2()
         elif self.key["left"] == (0,1) and self.key["right"] == (0,1):
             data = self._create_control4()
