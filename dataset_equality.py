@@ -102,26 +102,6 @@ def get_IIT_equality_dataset(variable, embed_dim, size, token_ids =None):
     interventions = torch.tensor(interventions)
     return X_base_train, y_base_train,X_sources_train,  y_IIT_train, interventions
 
-def get_equality_dataset(embed_dim, size):
-    class_size = size/2
-    train_dataset = PremackDataset(
-        embed_dim=embed_dim,
-        n_pos=class_size,
-        n_neg=class_size)
-    X_train, y_train = train_dataset.create()
-
-    test_dataset = PremackDataset(
-        embed_dim=embed_dim,
-        n_pos=class_size,
-        n_neg=class_size)
-    X_test, y_test = test_dataset.create()
-
-    train_dataset.test_disjoint(test_dataset)
-    X_train = torch.tensor(X_train)
-    X_test = torch.tensor(X_test)
-
-    return X_train, X_test, y_train, y_test, test_dataset
-
 class IIT_PremackDataset:
 
     V1 = 0
