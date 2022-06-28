@@ -255,6 +255,8 @@ class LayeredIntervenableModel(torch.nn.Module):
         when the interventions in `sets` are performed.
         """
         input = input.type(torch.FloatTensor).to(self.device)
+        for set in sets:
+            set["intervention"].to(self.device)
         self.activation = dict()
         get_val = [get] if get is not None else None
         set_val = sets if sets is not None else None
