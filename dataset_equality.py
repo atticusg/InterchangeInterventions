@@ -43,10 +43,10 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                     both_dataset[2][1]))],
                        torch.cat((V1_dataset[3],
                                     V2_dataset[3],
-                                    both_dataset[1])),
+                                    both_dataset[3])),
                        torch.cat((V1_dataset[4],
                                     V2_dataset[4],
-                                    both_dataset[1]))]
+                                    both_dataset[4]))]
 
     if token_ids is not None:
         combined_dataset[0] = totuple(combined_dataset[0])
@@ -70,9 +70,10 @@ def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     interventions = torch.tensor(interventions)
     return X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions
 
-def get_IIT_equality_dataset_control13(embed_dim, size, token_ids =None):
+def get_IIT_equality_dataset_control(key, embed_dim, size, token_ids =None):
     class_size = size/2
-    train_dataset = IIT_PremackDatasetControl13(
+    train_dataset = IIT_PremackDatasetControl(
+        key=key,
         embed_dim=embed_dim,
         n_pos=class_size,
         n_neg=class_size,
@@ -121,6 +122,166 @@ def get_equality_dataset(embed_dim, size):
     X_test = torch.tensor(X_test)
 
     return X_train, X_test, y_train, y_test, test_dataset
+
+class PremackDataset:
+
+    POS_LABEL = 1
+    NEG_LABEL = 0
+
+    def __init__(self, embed_dim=50, n_pos=500, n_neg=500,
+                 flatten_root=True, flatten_leaves=True, intermediate=False):
+        """Creates Premack datasets. Conceptually, the instances are
+        (((a, b), (c, d)), label)
+        where `label == POS_LABEL` if (a == b) == (c == d), else
+        `label == NEG_LABEL`. With `flatten_leaves=True`, these become
+        ((a;b, c;d), label)
+        and with `flatten_root=True`, these become
+        (a;b;c;d, label)
+        and `flatten_root=True` means that `flatten_leaves=True`, since
+        we can't flatten the roof without flattening the leaves.
+        Parameters
+        ----------
+        embed_dim : int
+            Sets the dimensionality of the individual component vectors.
+        n_pos : int
+        n_neg : int
+        flatten_root : bool
+        flatten_leaves : bool
+        Usage
+        -----
+        dataset = EqualityDataset()
+        X, y = dataset.create()
+        Attributes
+        ----------
+        embed_dim : int
+        n_pos : int
+        n_neg : int
+        flatten_root : bool
+        flatten_leaves : bool
+        n_same_same : n_pos / 2
+        n_diff_diff : n_pos / 2
+        n_same_diff : n_neg / 2
+        n_diff_same : n_neg / 2
+        Raises
+        ------
+        ValueError
+            If `n_pos` or `n_neg` is not even, since this means we
+            can't get an even distribtion of the two sub-types of
+            each of those classes while also staying faithful to
+            user's expected number of examples for each class.
+        """
+        self.embed_dim = embed_dim
+        self.n_pos = n_pos
+        self.n_neg = n_neg
+
+        for n, v in ((n_pos, 'n_pos'), (n_neg, 'n_neg')):
+            if n % 2 != 0:
+                raise ValueError(
+                    f"The value of {v} must be even to ensure a balanced "
+                    f"split across its two sub-types of the {v} class.")
+
+        self.n_same_same = int(n_pos / 2)
+        self.n_diff_diff = int(n_pos / 2)
+        self.n_same_diff = int(n_neg / 2)
+        self.n_diff_same = int(n_neg / 2)
+        self.flatten_root = flatten_root
+        self.flatten_leaves = flatten_leaves
+        self.intermediate = intermediate
+
+    def create(self):
+        """Main interface
+        Attributes
+        ----------
+        data : list
+            Shuffled version of the raw instances, ignoring
+            `self.flatten_root` and `self.flatten_leaves`.
+            Thus, these are all of the form `(((a, b), (c, d)), label)`
+        X : np.array
+            The dimensionality depends on `self.flatten_root` and
+            `self.flatten_leaves`.
+            If both are False, then
+            `X.shape == (n_pos+n_neg, 2, 2, embed_dim)`
+            If `self.flatten_root`, then
+            `X.shape == (n_pos+n_neg, embed_dim*4)`
+            If only `self.flatten_leaves`, then
+            `X.shape == (n_pos+n_neg, 2, embed_dim*2)`
+        y : list
+            Containing `POS_LABEL` and `NEG_LABEL`. Length: n_pos+n_neg
+        Returns
+        -------
+        self.X, self.y
+        """
+        self.data = []
+        self.data += self._create_same_same()
+        self.data += self._create_diff_diff()
+        self.data += self._create_same_diff()
+        self.data += self._create_diff_same()
+        random.shuffle(self.data)
+        data = self.data.copy()
+        if self.flatten_root or self.flatten_leaves:
+            data = [((np.concatenate(x1), np.concatenate(x2)), label)
+                    for (x1, x2), label in data]
+        if self.flatten_root:
+            data = [(np.concatenate(x), label) for x, label in data]
+        X, y = zip(*data)
+        self.X = np.array(X)
+        self.y = y
+        return self.X, self.y
+
+    def test_disjoint(self, other_dataset):
+        these_vecs = {tuple(x) for root_pair, label in self.data
+                               for pair in root_pair for x in pair}
+        other_vecs = {tuple(x) for root_pair, label in other_dataset.data
+                               for pair in root_pair for x in pair}
+        shared = these_vecs & other_vecs
+        assert len(shared) == 0, \
+            f"This dataset and the other dataset shared {len(shared)} word-level reps."
+
+    def _create_same_same(self):
+        data = []
+        for _ in range(self.n_same_same):
+            left = self._create_same_pair()
+            right = self._create_same_pair()
+            rep = (left, right)
+            data.append((rep, self.POS_LABEL))
+        return data
+
+    def _create_diff_diff(self):
+        data = []
+        for _ in range(self.n_diff_diff):
+            left = self._create_diff_pair()
+            right = self._create_diff_pair()
+            rep = (left, right)
+            data.append((rep, self.POS_LABEL))
+        return data
+
+    def _create_same_diff(self):
+        data = []
+        for _ in range(self.n_same_diff):
+            left = self._create_same_pair()
+            right = self._create_diff_pair()
+            rep = (left, right)
+            data.append((rep, self.NEG_LABEL))
+        return data
+
+    def _create_diff_same(self):
+        data = []
+        for _ in range(self.n_diff_same):
+            left = self._create_diff_pair()
+            right = self._create_same_pair()
+            rep = (left, right)
+            data.append((rep, self.NEG_LABEL))
+        return data
+
+    def _create_same_pair(self):
+        vec = randvec(self.embed_dim)
+        return (vec, vec)
+
+    def _create_diff_pair(self):
+        vec1 = randvec(self.embed_dim)
+        vec2 = randvec(self.embed_dim)
+        assert not np.array_equal(vec1, vec2)
+        return (vec1, vec2)
 
 class IIT_PremackDataset:
 
@@ -393,20 +554,22 @@ class IIT_PremackDataset:
             assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
 
-class IIT_PremackDatasetControl13:
+class IIT_PremackDatasetControl:
     V1 = 0
     V2 = 1
-    control13 = 3
+    control = 3
     POS_LABEL = 1
     NEG_LABEL = 0
 
     def __init__(self,
+                key={"left":0, "right":0},
                 embed_dim=50,
                 n_pos=500,
                 n_neg=500,
                 intermediate=False,
                 token_ids = None):
 
+        self.key = key
         if token_ids is None:
             self.bert = False
         else:
@@ -428,7 +591,14 @@ class IIT_PremackDatasetControl13:
         self.intermediate = intermediate
 
     def create(self):
-        data = self._create_control13(self.size)
+        if self.key["left"] in [0,1] and self.key["right"] in [0,1]:
+            data = self._create_control2()
+        elif self.key["left"] == (0,1) and self.key["right"] == (0,1):
+            data = self._create_control4()
+        elif self.key["left"] == () or self.key["right"] == ():
+            data = self._create_control1()
+        else:
+            data = self._create_control3()
         random.shuffle(data)
         data = data.copy()
         if self.bert:
@@ -436,20 +606,18 @@ class IIT_PremackDatasetControl13:
                 (
                     np.array(x1 + x2),
                     np.array(x3 + x4),
-                    np.array(x5 + x6),
                     base_label, IIT_label, intervention
                 )
-                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+                for (x1, x2, x3, x4), base_label, IIT_label, intervention in data
             ]
         else:
             data = [
                 (
                     np.concatenate(x1 + x2),
                     np.concatenate(x3 + x4),
-                    np.concatenate(x5 + x6),
                     base_label, IIT_label, intervention
                 )
-                for (x1, x2,x3,x4,x5,x6), base_label, IIT_label, intervention in data
+                for (x1, x2, x3, x4), base_label, IIT_label, intervention in data
             ]
         base, source, y, IIT_y, interventions = zip(*data)
         self.base = np.array(base)
@@ -461,12 +629,68 @@ class IIT_PremackDatasetControl13:
         self.sources.append(self.source)
         return self.base, self.y, self.sources, self.IIT_y, self.interventions
 
-    def _create_control13(self, size):
+    def _create_control1(self):
         data = []
-        for _ in range(int(size)):
+        for _ in range(int(self.size)):
             base_left = self._create_random_pair()
             base_right = self._create_random_pair()
-            intervention = self.control13
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            if self.key["left"] != () and random.choice([True,False]):
+                source_left = self._create_random_pair()
+                if self.key["left"] == 0:
+                    source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                else:
+                    source_left = (source_left[0],copy.deepcopy(base_left[0]))
+            else:
+                source_left = self._create_random_pair()
+
+            if self.key["right"] != () and random.choice([True,False]):
+                source_right = self._create_random_pair()
+                if self.key["right"] == 0:
+                    source_right = (copy.deepcopy(base_right[1]),
+                                    source_right[1])
+                else:
+                    source_right= (source_right[0],
+                                    copy.deepcopy(base_right[0]))
+            else:
+                source_right = self._create_random_pair()
+                
+            rep = (base_left, base_right, source_left, source_right)
+
+            if self.key["left"] == ():
+                left_value = (base_left[0] == base_left[1]).all()
+            else:
+                left_ind1 = self.key["left"]
+                left_ind2 = int( not self.key["left"])
+                left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
+
+            if self.key["right"] == ():
+                right_value = (base_right[0] == base_right[1]).all()
+            else:
+                right_ind1 = self.key["right"]
+                right_ind2 = int( not self.key["right"])
+                right_value = (source_right[right_ind1] == base_right[right_ind2]).all()
+
+
+            if left_value == right_value:
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+
+    def _create_control2(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
             if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
                 base_label = self.POS_LABEL
             else:
@@ -474,22 +698,115 @@ class IIT_PremackDatasetControl13:
 
             if random.choice([True,False]):
                 source_left = self._create_random_pair()
-                source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                if self.key["left"] == 0:
+                    source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                else:
+                    source_left = (source_left[0],copy.deepcopy(base_left[0]))
             else:
                 source_left = self._create_random_pair()
 
             if random.choice([True,False]):
                 source_right = self._create_random_pair()
-                source_right = (copy.deepcopy(base_right[1]), source_right[1])
+                if self.key["right"] == 0:
+                    source_right = (copy.deepcopy(base_right[1]),
+                                    source_right[1])
+                else:
+                    source_right= (source_right[0],
+                                    copy.deepcopy(base_right[0]))
             else:
                 source_right = self._create_random_pair()
 
             rep = (base_left, base_right, source_left, source_right)
 
-            if (source_left[0] == base_left[1]).all() == (source_right[0] == base_right[1]).all():
+            left_ind1 = self.key["left"]
+            left_ind2 = int( not self.key["left"])
+
+            right_ind1 = self.key["right"]
+            right_ind2 = int( not self.key["right"])
+
+            if (source_left[left_ind1] == base_left[left_ind2]).all() == \
+                (source_right[right_ind1] == base_right[right_ind2]).all():
                 IIT_label = self.POS_LABEL
             else:
                 IIT_label = self.NEG_LABEL
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+
+    def _create_control3(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            if self.key["left"] != (0,1) and random.choice([True,False]):
+                source_left = self._create_random_pair()
+                if self.key["left"] == 0:
+                    source_left = (copy.deepcopy(base_left[1]), source_left[1])
+                else:
+                    source_left = (source_left[0],copy.deepcopy(base_left[0]))
+            else:
+                source_left = self._create_random_pair()
+
+            if self.key["right"] != (0,1) and random.choice([True,False]):
+                source_right = self._create_random_pair()
+                if self.key["right"] == 0:
+                    source_right = (copy.deepcopy(base_right[1]),
+                                    source_right[1])
+                else:
+                    source_right= (source_right[0],
+                                    copy.deepcopy(base_right[0]))
+            else:
+                source_right = self._create_random_pair()
+
+            rep = (base_left, base_right, source_left, source_right)
+
+            if self.key["left"] == (0,1):
+                left_value = (source_left[0] == source_left[1]).all()
+            else:
+                left_ind1 = self.key["left"]
+                left_ind2 = int( not self.key["left"])
+                left_value = (source_left[left_ind1] == base_left[left_ind2]).all()
+
+            if self.key["right"] == (0,1):
+                right_value = (source_right[0] == source_right[1]).all()
+            else:
+                right_ind1 = self.key["right"]
+                right_ind2 = int( not self.key["right"])
+                right_value = (source_right[right_ind1] == base_right[right_ind2]).all()
+
+
+            if left_value == right_value:
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+
+    def _create_control4(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            source_left = self._create_random_pair()
+            source_right = self._create_random_pair()
+            if (source_left[0] == source_left[1]).all() == (source_right[0] == source_right[1]).all():
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+            rep = (base_left, base_right, source_left, source_right)
 
             data.append((rep, base_label, IIT_label, intervention))
         return data

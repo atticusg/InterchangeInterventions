@@ -748,7 +748,9 @@ class BERTLIMTrainer(LIMTrainer):
         sources, IIT_y, intervention_ids = iit_data
 
         if len(sources) == 1:
-            sources_input, sources_mask = sources
+            sources_input, sources_mask = sources[0]
+            sources_input = [sources_input]
+            sources_mask = [sources_mask]
         else:
             sources_input, sources_mask = zip(*sources)
         sources_input = [ torch.stack(input) for input in sources_input]
@@ -757,12 +759,12 @@ class BERTLIMTrainer(LIMTrainer):
         sources_input = torch.reshape(
             torch.stack(sources_input, dim=1),
             (-1, len(sources),
-            sources_input[0].shape[1]))
+            base_input.shape[-1]))
 
         sources_mask = torch.reshape(
             torch.stack(sources_mask, dim=1),
             (-1, len(sources),
-            sources_mask[0].shape[1]))
+            base_input.shape[-1]))
 
         intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
@@ -814,7 +816,7 @@ class BERTLIMTrainer(LIMTrainer):
         self.model.eval()
 
         with torch.no_grad():
-            preds = self.model((input, mask))
+            preds = self.model((input.squeeze(), mask.squeeze()))
 
         # Make sure the model is back on the instance device:
         self.model.set_device(self.device)
@@ -822,10 +824,10 @@ class BERTLIMTrainer(LIMTrainer):
 
 
     def process_batch(self,batch):
-        return (batch[0], batch[1]), batch[2]
+        return (batch[0].squeeze(), batch[1].squeeze()), batch[2]
 
     def process_IIT_batch(self,batch):
-        return (batch[3], batch[4]), batch[5], batch[6]
+        return (batch[3].squeeze(), batch[4].squeeze()), batch[5], batch[6]
 
 
     def iit_predict(self,
