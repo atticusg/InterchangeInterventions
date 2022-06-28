@@ -11,8 +11,6 @@ def get_IIT_MoNLI_dataset(embed_func, suffix, size):
         suffix=suffix,
         size=size)
     X_base, y_base, X_sources,  y_IIT, interventions = dataset.create()
-    X_base = torch.tensor(X_base)
-    X_sources = [torch.tensor(X_source) for X_source in X_sources]
     y_base = torch.tensor(y_base)
     y_IIT = torch.tensor(y_IIT)
     interventions = torch.tensor(interventions)
@@ -23,14 +21,12 @@ def get_NMoNLI_dataset(embed_func, suffix):
         embed_func=embed_func,
         suffix=suffix)
     X_base, y_base = dataset.create()
-    X_base = torch.tensor(X_base)
     y_base = torch.tensor(y_base)
     return X_base, y_base
 
 def get_PMoNLI_dataset(embed_func):
     dataset = PMoNLIDataset(embed_func=embed_func)
     X_base, y_base = dataset.create()
-    X_base = torch.tensor(X_base)
     y_base = torch.tensor(y_base)
     return X_base, y_base
 
