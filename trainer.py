@@ -749,8 +749,6 @@ class BERTLIMTrainer(LIMTrainer):
 
         if len(sources) == 1:
             sources_input, sources_mask = sources[0]
-            sources_input = [sources_input]
-            sources_mask = [sources_mask]
         else:
             sources_input, sources_mask = zip(*sources)
         sources_input = [ torch.stack(input) for input in sources_input]
