@@ -659,7 +659,7 @@ class IIT_PremackDatasetControl:
                                     copy.deepcopy(base_right[0]))
             else:
                 source_right = self._create_random_pair()
-
+                
             rep = (base_left, base_right, source_left, source_right)
 
             if self.key["left"] == ():
