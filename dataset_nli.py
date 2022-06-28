@@ -1,4 +1,4 @@
-    import json
+import json
 import copy
 import random
 import os
