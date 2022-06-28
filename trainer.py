@@ -748,7 +748,7 @@ class BERTLIMTrainer(LIMTrainer):
         sources, IIT_y, intervention_ids = iit_data
 
         if len(sources) == 1:
-            sources_input, sources_mask = sources
+            sources_input, sources_mask = sources[0]
         else:
             sources_input, sources_mask = zip(*sources)
         sources_input = [ torch.stack(input) for input in sources_input]
@@ -775,7 +775,7 @@ class BERTLIMTrainer(LIMTrainer):
                                                 intervention_ids)
         return dataset
 
-    def predict(self, X_base, device=None, unstacked=True):
+    def predict(self, X_base, device=None):
         """
         Internal method that subclasses are expected to use to define
         their own `predict` functions. The hope is that this method
@@ -806,9 +806,8 @@ class BERTLIMTrainer(LIMTrainer):
 
         # Dataset:
         input, mask = X_base
-        if unstacked:
-            input = torch.stack(input, dim=0).to(device)
-            mask = torch.stack(mask, dim=0).to(device)
+        input = torch.stack(input, dim=0).to(device)
+        mask = torch.stack(mask, dim=0).to(device)
 
         # Model:
         self.model.set_device(device)
