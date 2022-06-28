@@ -759,12 +759,12 @@ class BERTLIMTrainer(LIMTrainer):
         sources_input = torch.reshape(
             torch.stack(sources_input, dim=1),
             (-1, len(sources),
-            base_input[0].shape[2]))
+            base_input.shape[2]))
 
         sources_mask = torch.reshape(
             torch.stack(sources_mask, dim=1),
             (-1, len(sources),
-            base_input[0].shape[2]))
+            base_input.shape[2]))
 
         intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 

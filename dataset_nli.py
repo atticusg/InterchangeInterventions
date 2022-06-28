@@ -44,7 +44,10 @@ class NMoNLIDataset:
         with open(os.path.join(f"datasets", f"nmonli_{self.suffix}.jsonl")) as f:
             for line in f.readlines():
                 example =json.loads(line)
-                base_label = self.NEUTRAL_LABEL
+                if example["gold_label"] == "entailment":
+                    base_label = self.ENTAIL_LABEL
+                else:
+                    base_label = self.NEUTRAL_LABEL
                 base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
                 nmonli.append((base, base_mask, base_label))
 
@@ -67,7 +70,10 @@ class PMoNLIDataset:
         with open(os.path.join(f"datasets", f"pmonli.jsonl")) as f:
             for line in f.readlines():
                 example =json.loads(line)
-                base_label = self.ENTAIL_LABEL
+                if example["gold_label"] == "entailment":
+                    base_label = self.ENTAIL_LABEL
+                else:
+                    base_label = self.NEUTRAL_LABEL
                 base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
                 pmonli.append((base, base_mask, base_label))
 
