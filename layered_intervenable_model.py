@@ -256,8 +256,8 @@ class LayeredIntervenableModel(torch.nn.Module):
         """
         input = input.type(torch.FloatTensor).to(self.device)
         self.activation = dict()
-        get_val = {get} if get is not None else None
-        set_val = {set} if sets is not None else None
+        get_val = [get] if get is not None else None
+        set_val = [set] if sets is not None else None
         handlers = self._gets_sets(gets=get_val, sets=set_val)
         logits = self.model(input)
         for handler in handlers:
