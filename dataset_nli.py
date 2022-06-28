@@ -1,4 +1,4 @@
-import json
+    import json
 import copy
 import random
 import os
@@ -83,30 +83,47 @@ class IIT_MoNLIDataset:
         self.size = size
 
     def create(self):
-        pmonli = []
-        nmonli = []
+        pmonli_entail = []
+        pmonli_neutral = []
+        nmonli_entail = []
+        nmonli_neutral = []
         with open(os.path.join("datasets", "pmonli.jsonl")) as f:
             for line in f.readlines():
-                pmonli.append(json.loads(line))
+                example = json.loads(line)
+                if example["gold_label"] == "entailment":
+                    pmonli_entail.append(example)
+                else:
+                    pmonli_neutral.append(example)
+
         with open(os.path.join(f"datasets", f"nmonli_{self.suffix}.jsonl")) as f:
             for line in f.readlines():
-                nmonli.append(json.loads(line))
+                example = json.loads(line)
+                if example["gold_label"] == "entailment":
+                    nmonli_entail.append(example)
+                else:
+                    nmonli_neutral.append(example)
 
 
         data = []
 
+        sent_entail = pmonli_entail + nmonli_entail
+        neutral = pmonli_neutral + nmonli_neutral
+
+        word_entail = pmonli_entail + nmonli_neutral
+        word_neutral = pmonli_neutral + nmonli_entail
+
         while True:
-            example = random.choice(nmonli)
-            example2 = random.choice(nmonli)
+            example = random.choice(pmonli_entail)
+            example2 = random.choice(word_entail)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
-            base_label = self.NEUTRAL_LABEL
-            IIT_label = self.NEUTRAL_LABEL
+            base_label = self.ENTAIL_LABEL
+            IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-            example = random.choice(pmonli)
-            example2 = random.choice(nmonli)
+            example = random.choice(pmonli_entail)
+            example2 = random.choice(word_neutral)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
@@ -114,8 +131,27 @@ class IIT_MoNLIDataset:
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-            example = random.choice(nmonli)
-            example2 = random.choice(pmonli)
+
+            example = random.choice(nmonli_entail)
+            example2 = random.choice(word_entail)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.ENTAIL_LABEL
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+            example = random.choice(nmonli_entail)
+            example2 = random.choice(word_neutral)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.ENTAIL_LABEL
+            IIT_label = self.ENTAIL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+            example = random.choice(pmonli_neutral)
+            example2 = random.choice(word_entail)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
@@ -123,14 +159,34 @@ class IIT_MoNLIDataset:
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
-            example = random.choice(pmonli)
-            example2 = random.choice(pmonli)
+            example = random.choice(pmonli_neutral)
+            example2 = random.choice(word_neutral)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             intervention = self.LEXVAR
-            base_label = self.ENTAIL_LABEL
+            base_label = self.NEUTRAL_LABEL
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+
+            example = random.choice(nmonli_neutral)
+            example2 = random.choice(word_entail)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.NEUTRAL_LABEL
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+            example = random.choice(nmonli_neutral)
+            example2 = random.choice(word_neutral)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            intervention = self.LEXVAR
+            base_label = self.NEUTRAL_LABEL
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
             if len(data) > self.size:
                 break
 
