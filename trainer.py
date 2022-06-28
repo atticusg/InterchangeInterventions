@@ -815,7 +815,7 @@ class BERTLIMTrainer(LIMTrainer):
         self.model.eval()
 
         with torch.no_grad():
-            preds = self.model((input, mask))
+            preds = self.model((input.squeeze(), mask.squeeze()))
 
         # Make sure the model is back on the instance device:
         self.model.set_device(self.device)
