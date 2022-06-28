@@ -343,6 +343,7 @@ class LIMTrainer:
             for batch_num, batch in enumerate(dataloader, start=1):
                 batch = [x.to(self.device) for x in batch]
                 base_batch, base_labels_batch  = self.process_batch(batch)
+                print(base_batch[0].shape)
                 batch_preds = self.model(base_batch)
                 base_labels_batch = torch.squeeze(base_labels_batch)
                 err = self.loss(batch_preds, base_labels_batch)
