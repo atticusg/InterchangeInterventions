@@ -257,7 +257,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         input = input.type(torch.FloatTensor).to(self.device)
         if sets is not None:
             for i in range(len(sets)):
-                sets[i]["intervention"] = set["intervention"].to(self.device)
+                sets[i]["intervention"] = sets[i]["intervention"].to(self.device)
         self.activation = dict()
         get_val = [get] if get is not None else None
         set_val = sets if sets is not None else None
