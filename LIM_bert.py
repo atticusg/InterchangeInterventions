@@ -216,6 +216,11 @@ class LIMBERTClassifier(LayeredIntervenableModel):
 
 
         #unstack sources
+        if len(sources_mask.shape) == 2:
+            torch.unsqueeze(sources_mask, dim=1)
+        if len(sources_input.shape) == 2:
+            torch.unsqueeze(sources_input, dim=1)
+
         sources_mask = [sources_mask[:,j,:].squeeze(1).type(torch.FloatTensor).long().to(sources_mask.device)
            for j in range(sources_mask.shape[1])]
         sources_input = [sources_input[:,j,:].squeeze(1).type(torch.FloatTensor).long().to(sources_input.device)
