@@ -343,8 +343,6 @@ class LIMTrainer:
             for batch_num, batch in enumerate(dataloader, start=1):
                 batch = [x.to(self.device) for x in batch]
                 base_batch, base_labels_batch  = self.process_batch(batch)
-                print(base_batch[0].shape)
-                print(base_batch[1].shape)
                 batch_preds = self.model(base_batch)
                 base_labels_batch = torch.squeeze(base_labels_batch)
                 err = self.loss(batch_preds, base_labels_batch)
@@ -824,10 +822,10 @@ class BERTLIMTrainer(LIMTrainer):
 
 
     def process_batch(self,batch):
-        return (batch[0], batch[1]), batch[2]
+        return (batch[0].squeeze(), batch[1].squeeze()), batch[2]
 
     def process_IIT_batch(self,batch):
-        return (batch[3], batch[4]), batch[5], batch[6]
+        return (batch[3].squeeze(), batch[4].squeeze()), batch[5], batch[6]
 
 
     def iit_predict(self,
