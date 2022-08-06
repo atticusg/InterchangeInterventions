@@ -135,11 +135,22 @@ class LayeredIntervenableModel(torch.nn.Module):
             if "disentangle" in layer and (layer_num is None or layer_num == i):
                 layer["disentangle"].parametrizations.weight.original.requires_grad = True
 
+
     def unfreeze_model_parameters(self):
         """Unfreezes the model weights (for training purposes)"""
         for layer in self.labeled_layers:
             for param in layer["model"].parameters():
                 param.requires_grad = True
+
+    def analyze_disentanglement(id_to_coords):
+        result = dict()
+        for layer_num in id_to_coords:
+            lin = self.labeled_layers[layer_num]["disentangle"]
+            ortho_trans = lin.parametrizations.weight.original
+            id = torch.eye(lin.parametrizations.weight.original.shape[0])
+            start, end = id_to_coords[layer_num]["start"], id_to_coords[layer_num]["end"]
+            result[layer_num] = orthogonal_trans(id[:, start:end])
+        return result
 
 
     def forward(self, X):

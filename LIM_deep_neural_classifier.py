@@ -8,6 +8,28 @@ import utils
 __author__ = "Atticus Geiger"
 __version__ = "CS224u, Stanford, Spring 2022"
 
+class EmbeddedActivationLayer(torch.nn.Module):
+    def __init__(self,
+                input_dim,
+                output_dim,
+                device,
+                hidden_activation,
+                embedding_size_and_dim):
+        super().__init__()
+        self.device = device
+        embedding_size = embedding_size_and_dim[0]
+        embedding_dim = embedding_size_and_dim[1]
+        self.embeddings = torch.nn.Embedding(embedding_size,
+                                            embedding_dim,
+                                            device=device)
+        self.linear = nn.Linear(input_dim, output_dim, device=device)
+        self.activation = hidden_activation
+
+    def forward(self, x):
+        x = x.to(torch.int).to(self.device)
+        x = self.embeddings(x)
+        x = x.reshape([x.shape[0], x.shape[1]*x.shape[2]  ])
+        return self.activation(self.linear(x))
 
 class ActivationLayer(torch.nn.Module):
     def __init__(self, input_dim, output_dim, device, hidden_activation):
@@ -26,6 +48,7 @@ class LIMDeepNeuralClassifier(LayeredIntervenableModel):
             num_layers=1,
             input_dim=None,
             n_classes=None,
+            embedding_size_and_dim=None,
             device=None):
         """
         A layered interventable model
@@ -73,15 +96,25 @@ class LIMDeepNeuralClassifier(LayeredIntervenableModel):
         self.hidden_dim = hidden_dim
         self.input_dim = input_dim
         self.n_classes_ = n_classes
+        self.embedding_size_and_dim = embedding_size_and_dim
         self.hidden_activation = hidden_activation
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         self.model_layers = torch.nn.ModuleList()
-        self.model_layers.append(
-            ActivationLayer(
-                self.input_dim,
-                self.hidden_dim,
-                self.device,
-                self.hidden_activation))
+        if self.embedding_size_and_dim:
+            self.model_layers.append(
+                EmbeddedActivationLayer(
+                    self.input_dim,
+                    self.hidden_dim,
+                    self.device,
+                    self.hidden_activation,
+                    self.embedding_size_and_dim))
+        else:
+            self.model_layers.append(
+                ActivationLayer(
+                    self.input_dim,
+                    self.hidden_dim,
+                    self.device,
+                    self.hidden_activation))
         self.dims = [self.input_dim,self.hidden_dim]
         # Hidden to hidden:
         for i in range(self.num_layers-1):
