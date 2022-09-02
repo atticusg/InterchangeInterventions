@@ -1,4 +1,5 @@
 import copy
+import random
 import torch
 import itertools
 from sklearn.metrics import classification_report
@@ -117,21 +118,21 @@ classes_strings = [*nouns] + ["plants", "animals",
 def classwise_report(y, logits, classes="all"):
     preds = torch.clone(logits)
     preds[preds>0] = 1
-    preds[preds<0] = 0
+    preds[preds<=0] = 0
     report = ""
     if classes == "all":
         for clas in classes_strings:
             report += f"CLASSIFICATION FOR CLASS:{clas}"
             index = class_to_index(clas)
             report += "\n"
-            report += classification_report(preds[:, index], y[:, index])
+            report += classification_report(y[:, index], preds[:, index])
             report += "\n\n"
     else:
         for clas in classes:
-            print(f"CLASSIFICATION FOR CLASS:{clas}")
+            report += f"CLASSIFICATION FOR CLASS:{clas}"
             index = class_to_index(clas)
             report += "\n"
-            report += classification_report(preds[:, index], y[:, index])
+            report += classification_report(y[:, index],preds[:, index])
             report += "\n\n"
     return report
 
@@ -153,7 +154,7 @@ def word_to_index(word):
 def index_to_word(index):
     return words[index]
 
-def generate_data():
+def generate_data(one_hot=True):
     inputs = itertools.product(nouns, verbs)
     X = [(word_to_index(x[0]), word_to_index(x[1])) for x in inputs]
     y = []
@@ -173,15 +174,19 @@ def generate_data():
             class_label = int(x[0] in clas and x[1] == "has")
             label.append(class_label)
         y.append(label)
-    return torch.Tensor(X), torch.Tensor(y)
+    X, y = torch.Tensor(X), torch.Tensor(y)
+    if one_hot:
+        X = torch.nn.functional.one_hot(X.long())
+        X = torch.reshape(X, (-1, 50))
+    return X, y
 
-def generate_data_plants_have_roots_and_animals_can_move_and_have_skin():
+def generate_data_plants_have_roots_and_animals_can_move_and_have_skin(one_hot=True, batch_size = 2):
     X_base = []
     X_source = []
     y_base = []
     interventions = []
     y_iit = []
-    inputs = list(itertools.product(nouns, verbs))
+    inputs = list(itertools.product(copy.copy(nouns), copy.copy(verbs)))
     inputs2 = list(itertools.product(copy.copy(nouns), copy.copy(verbs)))
     for base in inputs:
         for source in inputs2:
@@ -212,7 +217,7 @@ def generate_data_plants_have_roots_and_animals_can_move_and_have_skin():
             index = 0
             for clas in ISA:
                 if index in [class_to_index("animals"), class_to_index("plants")]:
-                    class_label = int(source[0] in clas and source[1] == "is a")
+                    class_label = int(source[0] in clas and base[1] == "is a")
                     blackout_classes.append(index)
                 else:
                     class_label = int(base[0] in clas and base[1] == "is a")
@@ -224,7 +229,7 @@ def generate_data_plants_have_roots_and_animals_can_move_and_have_skin():
                 index +=1
             for clas in can:
                 if index == class_to_index("move"):
-                    class_label = int(source[0] in clas and source[1] == "can")
+                    class_label = int(source[0] in clas and base[1] == "can")
                     blackout_classes.append(index)
                 else:
                     class_label = int(base[0] in clas and base[1] == "can")
@@ -232,11 +237,20 @@ def generate_data_plants_have_roots_and_animals_can_move_and_have_skin():
                 index +=1
             for clas in has:
                 if index in [class_to_index("skin"), class_to_index("roots")]:
-                    class_label = int(source[0] in clas and source[1] == "has")
+                    class_label = int(source[0] in clas and base[1] == "has")
                     blackout_classes.append(index)
                 else:
                     class_label = int(base[0] in clas and base[1] == "has")
                 label.append(class_label)
                 index +=1
             y_iit.append(label)
-    return torch.Tensor(X_base), torch.Tensor(y_base), [torch.Tensor(X_source)],  torch.Tensor(y_iit), torch.Tensor(interventions), blackout_classes
+    temp = list(zip(X_base, y_base, X_source,  y_iit, interventions))
+    temp = [temp[k*batch_size:(k+1)*batch_size] for k in range(int(len(X_base)/batch_size))]
+    random.shuffle(temp)
+    temp = [item for group in temp for item in group]
+    X_base, y_base, X_source,  y_iit, interventions = list(zip(*temp))
+    X_base, y_base, X_source,  y_iit, interventions = torch.Tensor(X_base), torch.Tensor(y_base), torch.Tensor(X_source),  torch.Tensor(y_iit), torch.Tensor(interventions)
+    if one_hot:
+        X_base = torch.nn.functional.one_hot(X_base.long())
+        X_source = torch.nn.functional.one_hot(X_source.long())
+    return X_base, y_base, [X_source],  y_iit, interventions, blackout_classes
