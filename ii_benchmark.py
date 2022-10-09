@@ -1,5 +1,7 @@
+from operator import ge
 import torch
 import pandas as pd
+import numpy as np
 from sklearn.metrics import classification_report
 import utils
 from LIM_deep_neural_classifier import LIMDeepNeuralClassifier
@@ -178,6 +180,34 @@ def generate_all_alignments(num_layers=num_layers, hidden_dim=hidden_dim):
         'length_v2': lengths_v2,
         'overlap': overlaps
     })
+
+
+def get_possible_alignments(num_layers=num_layers, hidden_dim=hidden_dim):
+    possible_alignments = []
+    # assumes we don't want alignments at layer 0
+    for layer in range(1, num_layers):
+        possible_alignments += [{'layer': layer, 'start': i, 'end': i + 1} for i in range(hidden_dim)]
+    return possible_alignments
+
+
+def sample_alignment(n_samples=10):
+    possible_alignments = get_possible_alignments()
+    n_alignments = len(possible_alignments)
+    samples = []
+    for _ in n_samples:
+        # NOTE: assumption that a variable will not align to more than half of a model's neurons
+        n_v1 = np.random.randint(1, n_alignments // 2)
+        n_v2 = np.random.randint(1, n_alignments // 2)
+
+        sample = np.random.choice(a=possible_alignments, size=(n_v1 + n_v2))
+
+        samples.append({
+            V1: sample[:n_v1],
+            V2: sample[n_v1:],
+            BOTH: sample
+        })
+    
+    return samples
 
 
 def sample_alignments(all_alignments, n_samples=10):
