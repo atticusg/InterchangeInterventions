@@ -24,7 +24,9 @@ class LIMDeepNeuralClassifier(LayeredIntervenableModel):
             hidden_dim=50,
             hidden_activation=nn.Tanh(),
             num_layers=1,
+            vocab_size=None,
             input_dim=None,
+            embed_dim=None,
             n_classes=None,
             device=None):
         """
@@ -67,7 +69,7 @@ class LIMDeepNeuralClassifier(LayeredIntervenableModel):
 
         """
         super().__init__()
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = device if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
@@ -76,6 +78,14 @@ class LIMDeepNeuralClassifier(LayeredIntervenableModel):
         self.hidden_activation = hidden_activation
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         self.model_layers = torch.nn.ModuleList()
+        
+        # Inject an embedding layer!
+        self.embedding = None
+        if vocab_size is not None:
+            self.vocab_size = vocab_size
+            self.embed_dim = embed_dim
+            self.embedding = nn.Embedding(self.vocab_size, self.embed_dim)
+
         self.model_layers.append(
             ActivationLayer(
                 self.input_dim,

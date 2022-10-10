@@ -595,6 +595,10 @@ class IIT_PremackDatasetControl:
             data = self._create_control2()
         elif self.key["left"] == (0,1) and self.key["right"] == (0,1):
             data = self._create_control4()
+        elif self.key["left"] == (0,1) and self.key["right"] == ():
+            data = self._create_control5()
+        elif self.key["left"] == () and self.key["right"] == (0,1):
+            data = self._create_control6()
         elif self.key["left"] == () or self.key["right"] == ():
             data = self._create_control1()
         else:
@@ -811,6 +815,50 @@ class IIT_PremackDatasetControl:
             data.append((rep, base_label, IIT_label, intervention))
         return data
 
+    def _create_control5(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            source_left = self._create_random_pair()
+            source_right = self._create_random_pair()
+            if (source_left[0] == source_left[1]).all() == (base_right[0] == base_right[1]).all():
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+            rep = (base_left, base_right, source_left, source_right)
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+    
+    def _create_control6(self):
+        data = []
+        for _ in range(int(self.size)):
+            base_left = self._create_random_pair()
+            base_right = self._create_random_pair()
+            intervention = self.control
+            if (base_left[0] == base_left[1]).all() == (base_right[0] == base_right[1]).all():
+                base_label = self.POS_LABEL
+            else:
+                base_label = self.NEG_LABEL
+
+            source_left = self._create_random_pair()
+            source_right = self._create_random_pair()
+            if (base_left[0] == base_left[1]).all() == (source_right[0] == source_right[1]).all():
+                IIT_label = self.POS_LABEL
+            else:
+                IIT_label = self.NEG_LABEL
+            rep = (base_left, base_right, source_left, source_right)
+
+            data.append((rep, base_label, IIT_label, intervention))
+        return data
+    
     def _create_random_pair(self):
         if random.choice([True,False]):
             return self._create_same_pair()

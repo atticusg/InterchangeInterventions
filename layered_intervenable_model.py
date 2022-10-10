@@ -144,6 +144,12 @@ class LayeredIntervenableModel(torch.nn.Module):
 
     def forward(self, X):
         """Computes a forward pass with input `X`."""
+        if self.embedding is not None:
+            bs = X.shape[0]
+            X = X - 1
+            X = self.embedding(X)
+            X = X.view(bs, -1)
+
         if self.analysis:
             return self.analysis_model(X)
         else:
@@ -162,7 +168,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         integers to coordinates denoting the layer, start index, and end index.
         """
         #unstack sources
-        sources = [sources[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
+        sources = [sources[:,j,:].squeeze(1).to(self.device)
            for j in range(sources.shape[1])]
         #translate intervention_ids to coordinates
         gets =  intervention_ids_to_coords[int(intervention_ids.flatten()[0])]
