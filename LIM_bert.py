@@ -51,7 +51,7 @@ class SequentialLayers(torch.nn.Module):
                     suffix = output[:,target_dims["end"]:]
                     args = layer(target)
             elif isinstance(layer, InverseLinearLayer):
-                args = (torch.cat(prefix, layer(args), suffix).reshape(original_shape), *rest)
+                args = (torch.cat(prefix, layer(args), suffix, 1).reshape(original_shape), *rest)
             else:
                 args = layer(*args)
         return args
