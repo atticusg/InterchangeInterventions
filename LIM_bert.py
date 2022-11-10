@@ -4,7 +4,7 @@ from layered_intervenable_model import LayeredIntervenableModel, LinearLayer, In
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
 
 class SequentialLayers(torch.nn.Module):
-    def __init__(self, *args):
+    def __init__(self, *args, target_dims=None):
         super().__init__()
         self.layers = args
 
@@ -42,9 +42,15 @@ class SequentialLayers(torch.nn.Module):
                 original_shape = copy.deepcopy(output.shape)
                 output = torch.reshape(output, (original_shape[0], -1))
                 rest = args[1:]
-                args = layer(output)
+                if target_dims is None:
+                    args = layer(output)
+                else:
+                    target = output[target_dims["start"]:target_dims["end"]]
+                    prefix = output[:target_dims["start"]]
+                    suffix = output[target_dims["end"]:]
+                    args = layer(target)
             elif isinstance(layer, InverseLinearLayer):
-                args = (layer(args).reshape(original_shape), *rest)
+                args = (torch.cat(prefix, layer(args), suffix).reshape(original_shape), *rest)
             else:
                 args = layer(*args)
         return args
@@ -176,7 +182,8 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         self.bert.train()
         self.hidden_dim = self.bert.embeddings.word_embeddings.embedding_dim
         n = self.hidden_dim*max_length
-
+        if self.target_dims is not None:
+            n = self.target_dims["end"]-self.target_dims["start"]
 
         self.model_dims = [n]
         self.model_layers = torch.nn.ModuleList()

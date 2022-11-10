@@ -5,9 +5,9 @@ import numpy as np
 from sklearn.metrics import classification_report
 from transformers import BertTokenizer, BertModel
 
-from trainer import LIMTrainer
+from trainer import LIMTrainer, BERTLIMTrainer
 from LIM_deep_neural_classifier import LIMDeepNeuralClassifier
-
+from LIM_bert import LIMBERTClassifier
 import dataset_equality
 import dataset_nli
 
@@ -28,32 +28,32 @@ class IIBenchmark:
         self.model_parameters = model_parameters
         self.training_parameters = training_parameters
         self.seed = seed
-        
+
         utils.fix_random_seeds()
 
         self.train_dataset, self.test_dataset = self.load_datasets()
-    
+
 
     def load_datasets(self):
         return
 
 
     def create_model(self):
-        return 
+        return
 
-    
+
     def create_classifier(self, model):
         return
 
-    
+
     def evaluate(self, model, alignment):
         """
-        Evaluates an alignment for a Layered Intervenable Model (LIM) on the 
+        Evaluates an alignment for a Layered Intervenable Model (LIM) on the
         interchange-interventions objective.
 
         Returns
         --------
-        tuple of size = (number of variable, 2), with the following format: 
+        tuple of size = (number of variable, 2), with the following format:
             (
                 (y_true for V1 alignment, y_pred for V1 alignment),
                 (y_true for V2 alignment, y_pred for V2 alignment),
@@ -65,16 +65,16 @@ class IIBenchmark:
             X_base_test, y_base_test, X_sources_test, y_IIT_test, interventions = self.test_dataset[i]
 
             LIM_trainer = self.create_classifier(model)
-            
+
             IIT_preds = LIM_trainer.iit_predict(X_base_test,
                                                 X_sources_test,
                                                 interventions,
                                                 alignment, device='cpu')
-            
+
             result += [(y_IIT_test, IIT_preds)]
 
         return tuple(result)
-    
+
 
     def display_evaluations(self, evaluations):
         """
@@ -82,7 +82,7 @@ class IIBenchmark:
         """
         for e, var_name in zip(evaluations, VARIABLE_NAMES):
             print(f'II-Evaluation on {var_name}')
-            print(classification_report(*e)) 
+            print(classification_report(*e))
 
 
     def train_model(self, variable, alignment):
@@ -102,8 +102,8 @@ class IIBenchmark:
 
         # train model
         _ = LIM_trainer.fit(
-            X_base_train, 
-            y_base_train, 
+            X_base_train,
+            y_base_train,
             iit_data=(
                 X_sources_train,
                 y_IIT_train,
@@ -118,7 +118,7 @@ class IIBenchmark:
 
     def get_alignments_for_layer(self, layer):
         possible_alignments = [
-            {'layer': layer, 'start': i, 'end': i + 1} 
+            {'layer': layer, 'start': i, 'end': i + 1}
             for i in range(self.model_parameters['hidden_dim'])
         ]
         return possible_alignments
@@ -144,10 +144,10 @@ class IIBenchmark:
                 V2: sample[n_v1:],
                 BOTH: sample
             })
-        
+
         return samples
 
-    
+
     def train_models(self, alignments, name='equality'):
         """
         Train benchmark models using IIT for each model in the list of alignments.
@@ -157,10 +157,10 @@ class IIBenchmark:
             for i, variable in enumerate(self.variable_names):
                 LIM_model = self.train_model(i, alignment)
                 torch.save(
-                    LIM_model.state_dict(), 
+                    LIM_model.state_dict(),
                     f"./models/{name}-{variable}-{i:0>2d}.pt"
                 )
-    
+
 
     def load_model(self, path):
         """
@@ -184,7 +184,7 @@ class IIBenchmarkEquality(IIBenchmark):
             'num_layers': 3, 'hidden_dim': 16, 'hidden_activation': torch.nn.ReLU(), 'input_dim': 16, 'n_classes': 2
         },
         training_parameters={
-            'warm_start': True, 'max_iter': 10, 'batch_size': 64, 'n_iter_no_change': 10000, 
+            'warm_start': True, 'max_iter': 10, 'batch_size': 64, 'n_iter_no_change': 10000,
             'shuffle_train': False, 'eta': 0.001
         },
         seed=42
@@ -215,13 +215,13 @@ class IIBenchmarkEquality(IIBenchmark):
         iit_equality_test = [iit_equality_test_v1, iit_equality_test_v2, iit_equality_test_both]
 
         return iit_equality_train, iit_equality_test
-    
+
 
     def create_model(self):
         return LIMDeepNeuralClassifier(
             **self.model_parameters
         )
-    
+
 
     def create_classifier(self, model):
         return LIMTrainer(
@@ -238,10 +238,10 @@ class IIBenchmarkMoNli(IIBenchmark):
             'train_size': 10000, 'test_size': 10000
         },
         model_parameters={
-            'weights_name': 'bert_base_uncased', 'max_length': 20, 'n_classes': 2, 'hidden_dim': 768
+            'weights_name': 'bert-base-uncased', 'max_length': 40, 'n_classes': 2, 'hidden_dim': 768
         },
         training_parameters={
-            'warm_start': True, 'max_iter': 5, 'batch_size': 16, 'n_iter_no_change': 10000, 
+            'warm_start': True, 'max_iter': 5, 'batch_size': 16, 'n_iter_no_change': 10000,
             'shuffle_train': False, 'eta': 0.0001
         },
         seed=42
@@ -272,18 +272,18 @@ class IIBenchmarkMoNli(IIBenchmark):
         iit_MoNLI_train = dataset_nli.get_IIT_MoNLI_dataset(encoding, 'train', self.data_parameters['train_size'])
         iit_MoNLI_test = dataset_nli.get_IIT_MoNLI_dataset(encoding, 'test', self.data_parameters['test_size'])
         return iit_MoNLI_train, iit_MoNLI_test
-    
+
 
     def create_model(self):
         bert = BertModel.from_pretrained(self.model_parameters['weights_name'])
 
         return LIMBERTClassifier(
-            self.model_parameters['n_classes'], 
-            bert, 
-            self.model_parameters['max_length'], 
-            debug=True
+            self.model_parameters['n_classes'],
+            bert,
+            self.model_parameters['max_length'],
+            debug=self.model_parameters['debug'],
         )
-    
+
 
     def create_classifier(self, model):
         return BERTLIMTrainer(

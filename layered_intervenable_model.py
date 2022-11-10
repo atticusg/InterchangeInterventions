@@ -27,7 +27,11 @@ class LinearLayer(torch.nn.Module):
         return torch.matmul(x, self.weight)
 
 class LayeredIntervenableModel(torch.nn.Module):
-    def __init__(self, device=None, debug=False, use_wrapper=False):
+    def __init__(self,
+            device=None,
+            debug=False,
+            use_wrapper=False,
+            target_dims=None,):
         """
 
         Base class for all the PyTorch-based models.
@@ -65,6 +69,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.debug = debug
         self.combiner = torch.nn.Sequential
         self.use_wrapper = use_wrapper
+        self.target_dims = target_dims
 
     def build_graph(self, model_layers, model_layer_dims):
         self.analysis_model = torch.nn.ModuleList()
@@ -90,9 +95,14 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.normal_model.extend([model_layers[-1]])
         self.analysis_model.extend([model_layers[-1]])
 
-        self.normal_model = self.combiner(*self.normal_model)
-        self.analysis_model = self.combiner(*self.analysis_model)
-
+        if self.target_dims is None:
+            self.normal_model = self.combiner(*self.normal_model)
+            self.analysis_model = self.combiner(*self.analysis_model)
+        else:
+            self.normal_model = self.combiner(*self.normal_model,
+                                                    self.target_dims)
+            self.analysis_model = self.combiner(*self.analysis_model,
+                                                    self.target_dims)
         self.set_analysis_mode(False)
 
 
