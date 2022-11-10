@@ -7,6 +7,7 @@ class SequentialLayers(torch.nn.Module):
     def __init__(self, *args, target_dims=None):
         super().__init__()
         self.layers = args
+        self.target_dims = target_dims
 
     def forward(self,
                 hidden_states,
@@ -43,7 +44,7 @@ class SequentialLayers(torch.nn.Module):
                 original_shape = copy.deepcopy(output.shape)
                 output = torch.reshape(output, (original_shape[0], -1))
                 rest = args[1:]
-                if target_dims is None:
+                if self.target_dims is None:
                     args = layer(output)
                 else:
                     target = output[:,target_dims["start"]:target_dims["end"]]
