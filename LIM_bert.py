@@ -47,9 +47,9 @@ class SequentialLayers(torch.nn.Module):
                 if self.target_dims is None:
                     args = layer(output)
                 else:
-                    target = output[:,target_dims["start"]:target_dims["end"]]
-                    prefix = output[:,:target_dims["start"]]
-                    suffix = output[:,target_dims["end"]:]
+                    target = output[:,self.target_dims["start"]:self.target_dims["end"]]
+                    prefix = output[:,:self.target_dims["start"]]
+                    suffix = output[:,self.target_dims["end"]:]
                     args = layer(target)
             elif isinstance(layer, InverseLinearLayer):
                 args = (torch.cat([prefix, layer(args), suffix], 1).reshape(original_shape), *rest)
