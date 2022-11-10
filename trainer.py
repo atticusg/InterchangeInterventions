@@ -27,6 +27,7 @@ class LIMTrainer:
             tol=1e-5,
             device=None,
             display_progress=True,
+            blackout_classes=None,
             **optimizer_kwargs):
         """
         Base class for all the PyTorch-based models.
@@ -151,6 +152,7 @@ class LIMTrainer:
         self.n_iter_no_change = n_iter_no_change
         self.tol = tol
         self.first_run = True
+        self.blackout_classes = blackout_classes
         self.loss = nn.CrossEntropyLoss(reduction="mean")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -185,16 +187,18 @@ class LIMTrainer:
 
         intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
-        base_y = np.array(base_y)
-        self.classes_ = sorted(set(base_y))
-        self.n_classes_ = len(self.classes_)
-        class2index = dict(zip(self.classes_, range(self.n_classes_)))
-        base_y = [class2index[label] for label in base_y]
-        base_y = torch.tensor(base_y)
+        if not torch.is_tensor(base_y):
+            base_y = np.array(base_y)
+            self.classes_ = sorted(set(base_y))
+            self.n_classes_ = len(self.classes_)
+            class2index = dict(zip(self.classes_, range(self.n_classes_)))
+            base_y = [class2index[label] for label in base_y]
+            base_y = torch.tensor(base_y)
 
-        IIT_y = np.array(IIT_y)
-        IIT_y = [class2index[int(label)] for label in IIT_y]
-        IIT_y = torch.tensor(IIT_y)
+        if not torch.is_tensor(IIT_y):
+            IIT_y = np.array(IIT_y)
+            IIT_y = [class2index[int(label)] for label in IIT_y]
+            IIT_y = torch.tensor(IIT_y)
 
         dataset = torch.utils.data.TensorDataset(
             base, base_y, sources, IIT_y, intervention_ids)
@@ -203,12 +207,13 @@ class LIMTrainer:
     def build_dataset(self, base_x, base_y):
         base_x = torch.FloatTensor(np.array(base_x))
 
-        base_y = np.array(base_y)
-        self.classes_ = sorted(set(base_y))
-        self.n_classes_ = len(self.classes_)
-        class2index = dict(zip(self.classes_, range(self.n_classes_)))
-        base_y = [class2index[label] for label in base_y]
-        base_y = torch.tensor(base_y)
+        if not torch.is_tensor(base_y):
+            base_y = np.array(base_y)
+            self.classes_ = sorted(set(base_y))
+            self.n_classes_ = len(self.classes_)
+            class2index = dict(zip(self.classes_, range(self.n_classes_)))
+            base_y = [class2index[label] for label in base_y]
+            base_y = torch.tensor(base_y)
 
         dataset = torch.utils.data.TensorDataset(base_x, base_y)
         return dataset
@@ -345,9 +350,14 @@ class LIMTrainer:
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
                 base_labels_batch = torch.squeeze(base_labels_batch)
-                # cast base labels to Long for CE loss
-                # (torch doesn't have CE loss for Int labels in some versions, I think?)
-                err = self.loss(batch_preds, base_labels_batch.to(torch.long))
+
+                if self.blackout_classes is None:
+                                # cast base labels to Long for CE loss
+                    # (torch doesn't have CE loss for Int labels in some versions, I think?)
+                    err = self.loss(batch_preds, base_labels_batch.to(torch.long))
+                else:
+                    err = self.loss(batch_preds[self.blackout_classes], base_labels_batch[self.blackout_classes])
+
                 if iit_data is not None:
                     sources_batch, iit_labels_batch, intervention_ids_batch \
                         = self.process_IIT_batch(batch)
@@ -356,8 +366,12 @@ class LIMTrainer:
                                     sources_batch,
                                     intervention_ids_batch,
                                     intervention_ids_to_coords)
-                    # same casting done over here
-                    err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
+                    if self.blackout_classes is None:
+                         # same casting done over here
+                        err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
+                    else:
+                        err += self.loss(batch_iit_preds[self.blackout_classes], iit_labels_batch[self.blackout_classes])
+
                 if self.gradient_accumulation_steps > 1 and \
                   self.loss.reduction == "mean":
                     err /= self.gradient_accumulation_steps
@@ -526,7 +540,8 @@ class LIMTrainer:
             self.best_error = epoch_error
         self.errors.append(epoch_error)
 
-    def predict(self, X_base, device=None):
+
+    def predict_logits(self, X_base, device=None):
         """
         Internal method that subclasses are expected to use to define
         their own `predict` functions. The hope is that this method
@@ -567,9 +582,13 @@ class LIMTrainer:
 
         # Make sure the model is back on the instance device:
         self.model.to(self.device)
-        return preds.argmax(axis=1)
+        return preds
 
-    def iit_predict(self,
+    def predict(self, X_base, device=None):
+        return self.predict_logits(X_base, device=None).argmax(axis=1)
+
+
+    def iit_predict_logits(self,
                     base,
                     sources,
                     intervention_ids,
@@ -604,10 +623,11 @@ class LIMTrainer:
         device = self.device if device is None else torch.device(device)
 
         # Dataset:
-        base = base.float().to(device)
-        sources = [source.to(device) for source in sources]
+        if device == "cpu":
+            base = base.float().to(device)
+            sources = [source.to(device) for source in sources]
 
-        intervention_ids = intervention_ids.float().to(device)
+            intervention_ids = intervention_ids.float().to(device)
 
         base_labels = [ 0 for _ in range(base.shape[0])]
         iit_labels = [ 0 for _ in range(base.shape[0])]
@@ -645,8 +665,20 @@ class LIMTrainer:
         # Make sure the model is back on the instance device:
         self.model.set_device(self.device)
         self.model.device = old_device
-        return preds.argmax(axis=1)
+        return preds
 
+    def iit_predict(self,
+                    base,
+                    sources,
+                    intervention_ids,
+                    intervention_ids_to_coords,
+                    device=None):
+        return self.iit_predict_logits(
+                    base,
+                    sources,
+                    intervention_ids,
+                    intervention_ids_to_coords,
+                    device).argmax(axis=1)
 
     def get_params(self, deep=True):
         params = self.params.copy()
