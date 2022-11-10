@@ -32,7 +32,7 @@ class LayeredIntervenableModel(torch.nn.Module):
             debug=False,
             use_wrapper=False,
             target_dims=None,
-            target_layer=None):
+            target_layers=None):
         """
 
         Base class for all the PyTorch-based models.
@@ -71,7 +71,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.combiner = torch.nn.Sequential
         self.use_wrapper = use_wrapper
         self.target_dims = target_dims
-        self.target_layer = target_layer
+        self.target_layers = target_layers
 
     def build_graph(self, model_layers, model_layer_dims):
         self.analysis_model = torch.nn.ModuleList()
@@ -81,7 +81,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         for index, model_layer in enumerate(model_layers[:-1]):
             self.normal_model.append(model_layer)
             self.analysis_model.extend([model_layer])
-            if not self.debug and (self.target_layer is None or self.target_layer==index):
+            if not self.debug and (self.target_layer is None or index in self.target_layers):
                 lin_layer = LinearLayer(model_layer_dims[index+1],
                                         self.device)
                 lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
