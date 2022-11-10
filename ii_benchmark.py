@@ -283,7 +283,7 @@ class IIBenchmarkMoNli(IIBenchmark):
             self.model_parameters['max_length'],
             debug=self.model_parameters['debug'],
             target_dims = self.model_parameters['target_dims'],
-            target_layer=self.model_parameters['target_layer'],
+            target_layers=self.model_parameters['target_layers'],
         )
 
 
