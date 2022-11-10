@@ -269,6 +269,9 @@ class LayeredIntervenableModel(torch.nn.Module):
                 hook = self.make_hook(gets,sets, layer_num)
                 if "disentangle" in layer:
                     handler = layer["disentangle"].register_forward_hook(hook)
+                else:
+                    hook = self.make_hook(gets,sets, layer_num, use_wrapper=self.use_wrapper)
+                    handler = layer["model"].register_forward_hook(hook)
             else:
                 hook = self.make_hook(gets,sets, layer_num, use_wrapper=self.use_wrapper)
                 handler = layer["model"].register_forward_hook(hook)
