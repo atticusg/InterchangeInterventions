@@ -81,7 +81,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         for index, model_layer in enumerate(model_layers[:-1]):
             self.normal_model.append(model_layer)
             self.analysis_model.extend([model_layer])
-            if not self.debug and (self.target_layer is None or index in self.target_layers):
+            if not self.debug and (self.target_layers is None or index in self.target_layers):
                 lin_layer = LinearLayer(model_layer_dims[index+1],
                                         self.device)
                 lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
