@@ -35,7 +35,8 @@ class SequentialLayers(torch.nn.Module):
         args = self.layers[0](*args)
         count = 0
 
-
+        prefix = None
+        suffix = None
         for layer in self.layers[1:]:
             if isinstance(layer, LinearLayer):
                 output = args[0]
