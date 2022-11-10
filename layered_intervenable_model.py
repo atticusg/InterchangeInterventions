@@ -102,9 +102,9 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.analysis_model = self.combiner(*self.analysis_model)
         else:
             self.normal_model = self.combiner(*self.normal_model,
-                                                    self.target_dims)
+                                                    target_dims = self.target_dims)
             self.analysis_model = self.combiner(*self.analysis_model,
-                                                    self.target_dims)
+                                                    target_dims = self.target_dims)
         self.set_analysis_mode(False)
 
 
