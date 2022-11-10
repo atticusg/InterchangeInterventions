@@ -174,8 +174,14 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 max_length=20,
                 device=None,
                 use_wrapper=True,
-                debug=False):
-        super().__init__(debug=debug, use_wrapper=use_wrapper)
+                debug=False,
+                target_dims = None,
+                target_layer =None 
+                ):
+        super().__init__(debug=debug,
+                        use_wrapper=use_wrapper,
+                        target_dims=target_dims,
+                        target_layer=target_layer)
         self.combiner = SequentialLayers
         self.n_classes = n_classes
         self.bert = bert
