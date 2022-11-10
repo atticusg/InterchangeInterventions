@@ -497,7 +497,7 @@ class LIMTrainer:
             dataset,
             batch_size=self.batch_size,
             shuffle=shuffle,
-            pin_memory=True,
+            pin_memory=False,
             collate_fn=collate_fn)
         return dataloader
 
@@ -801,7 +801,7 @@ class BERTLIMTrainer(LIMTrainer):
             (-1, len(sources),
             base_input.shape[-1]))
 
-        if isinstance(intervention_ids, list): 
+        if isinstance(intervention_ids, list):
             intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
         dataset = torch.utils.data.TensorDataset(base_input,
