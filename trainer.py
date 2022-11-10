@@ -581,18 +581,6 @@ class LIMTrainer:
     def predict(self, X_base, device=None):
         return self.predict_logits(X_base, device=None).argmax(axis=1)
 
-    def iit_predict(self,
-                    base,
-                    sources,
-                    intervention_ids,
-                    intervention_ids_to_coords,
-                    device=None):
-        return iit_predict_logits(self,
-                    base,
-                    sources,
-                    intervention_ids,
-                    intervention_ids_to_coords,
-                    device=None).argmax(axis=1)
 
     def iit_predict_logits(self,
                     base,
@@ -673,6 +661,18 @@ class LIMTrainer:
         self.model.device = old_device
         return preds
 
+    def iit_predict(self,
+                    base,
+                    sources,
+                    intervention_ids,
+                    intervention_ids_to_coords,
+                    device=None):
+        return self.iit_predict_logits(
+                    base,
+                    sources,
+                    intervention_ids,
+                    intervention_ids_to_coords,
+                    device).argmax(axis=1)
 
     def get_params(self, deep=True):
         params = self.params.copy()
