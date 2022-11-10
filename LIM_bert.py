@@ -45,9 +45,9 @@ class SequentialLayers(torch.nn.Module):
                 if target_dims is None:
                     args = layer(output)
                 else:
-                    target = output[target_dims["start"]:target_dims["end"]]
-                    prefix = output[:target_dims["start"]]
-                    suffix = output[target_dims["end"]:]
+                    target = output[:,target_dims["start"]:target_dims["end"]]
+                    prefix = output[:,:target_dims["start"]]
+                    suffix = output[:,target_dims["end"]:]
                     args = layer(target)
             elif isinstance(layer, InverseLinearLayer):
                 args = (torch.cat(prefix, layer(args), suffix).reshape(original_shape), *rest)
@@ -176,7 +176,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 use_wrapper=True,
                 debug=False,
                 target_dims = None,
-                target_layer =None 
+                target_layer =None
                 ):
         super().__init__(debug=debug,
                         use_wrapper=use_wrapper,
