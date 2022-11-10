@@ -108,10 +108,10 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.set_analysis_mode(False)
 
 
-    def set_analysis_mode(self, mode):
+    def set_analysis_mode(self, mode, layers=None):
         self.analysis = mode
         if self.analysis:
-            self.unfreeze_disentangling_parameters()
+            self.unfreeze_disentangling_parameters(layers=layers)
             self.freeze_model_parameters()
         else:
             self.freeze_disentangling_parameters()
@@ -141,10 +141,10 @@ class LayeredIntervenableModel(torch.nn.Module):
                 param.requires_grad = False
                 param.grad = None
 
-    def unfreeze_disentangling_parameters(self, layer_num=None):
+    def unfreeze_disentangling_parameters(self, layers=None):
         """Unfreezes the orthogonal transformations used for disentangling"""
         for i, layer in enumerate(self.labeled_layers):
-            if "disentangle" in layer and (layer_num is None or layer_num == i):
+            if "disentangle" in layer and (layers is None or i in layers):
                 layer["disentangle"].parametrizations.weight.original.requires_grad = True
 
 
