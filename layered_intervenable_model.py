@@ -183,7 +183,10 @@ class LayeredIntervenableModel(torch.nn.Module):
         #retrieve the value of interventions by feeding in the source inputs
         for i, get in enumerate(gets):
             handlers = self._gets_sets(gets =[get],sets = None)
-            source_logits = self.forward(sources[i])
+            # NOTE: not sure why we need a new source for every alignment location,
+            # so changing this to just take the first (and only?) source
+            # source_logits = self.forward(sources[i])
+            source_logits = self.forward(sources[0])
             for handler in handlers:
                 handler.remove()
             sets[i]["intervention"] =\
