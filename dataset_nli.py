@@ -125,13 +125,16 @@ class IIT_MoNLIDataset:
         word_entail = pmonli_entail + nmonli_neutral
         word_neutral = pmonli_neutral + nmonli_entail
 
+        def get_intervention(base,source):
+            return min([i if not torch.equal(base[i,:], source[i,:]) else base.shape[0] + 42 for i in range(base.shape[0])])
+
         while True:
             example = random.choice(pmonli_entail)
             example2 = random.choice(word_entail)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = min([i if not torch.equal(base[i,:], source[i,:]) else base.shape[0] + 42 for i in range(base.shape[0])])
             base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
@@ -140,6 +143,7 @@ class IIT_MoNLIDataset:
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
@@ -149,6 +153,7 @@ class IIT_MoNLIDataset:
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
@@ -157,6 +162,7 @@ class IIT_MoNLIDataset:
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
@@ -165,6 +171,7 @@ class IIT_MoNLIDataset:
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
@@ -173,6 +180,7 @@ class IIT_MoNLIDataset:
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
@@ -182,6 +190,7 @@ class IIT_MoNLIDataset:
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
@@ -190,12 +199,13 @@ class IIT_MoNLIDataset:
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
             base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
 
             if len(data) > self.size:
                 break
-
+        data.sort(key=lambda x,y: x[-1] < y[-1])
 
         base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
         self.base = base
