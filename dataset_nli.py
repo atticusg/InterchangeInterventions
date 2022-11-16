@@ -128,7 +128,7 @@ class IIT_MoNLIDataset:
         def get_intervention(base,source):
             SEP_ID = 1012
             SEP_IND = int((base == SEP_ID).nonzero(as_tuple=True)[1][0])
-            return min([i if int(base[0,SEP_IND +i]) != int(base[0,i]) else base.shape[1] + 42 for i in range(base.shape[1]-SEP_IND)])
+            return min([i if int(base[0,SEP_IND +i]) != int(base[0,i]) else base.shape[1] + 42 for i in range(1,base.shape[1]-SEP_IND)])
 
         while True:
             example = random.choice(pmonli_entail)
