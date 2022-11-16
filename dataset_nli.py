@@ -126,6 +126,9 @@ class IIT_MoNLIDataset:
         word_neutral = pmonli_neutral + nmonli_entail
 
         def get_intervention(base,source):
+            print(base)
+            print(source)
+            print(min([i if int(base[0,i]) != (source[0,i]) else base.shape[1] + 42 for i in range(base.shape[1])]))
             return min([i if int(base[0,i]) != (source[0,i]) else base.shape[1] + 42 for i in range(base.shape[1])])
 
         while True:
