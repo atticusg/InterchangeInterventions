@@ -126,7 +126,7 @@ class IIT_MoNLIDataset:
         word_neutral = pmonli_neutral + nmonli_entail
 
         def get_intervention(base,source):
-            return min([i if not torch.equal(base[i,:], source[i,:]) else base.shape[0] + 42 for i in range(base.shape[0])])
+            return min([i if not torch.equal(base[i], source[i]) else base.shape[0] + 42 for i in range(base.shape[0])])
 
         while True:
             example = random.choice(pmonli_entail)
@@ -206,6 +206,7 @@ class IIT_MoNLIDataset:
             if len(data) > self.size:
                 break
         data.sort(key=lambda x: x[-1])
+        for i in range
 
         base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
         self.base = base
