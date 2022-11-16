@@ -86,7 +86,6 @@ class PMoNLIDataset:
 
 class IIT_MoNLIDataset:
 
-    LEXVAR = 0
     ENTAIL_LABEL = 0
     NEUTRAL_LABEL = 1
     CONTRADICTION_LABEL = 2
@@ -131,7 +130,7 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_entail)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
+            intervention = min([i if not torch.equal(base[i,:], source[i,:]) else base.shape[0] + 42 for i in range(base.shape[0])])
             base_label = self.ENTAIL_LABEL
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
@@ -140,7 +139,6 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_neutral)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
             base_label = self.ENTAIL_LABEL
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
@@ -150,7 +148,6 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_entail)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
             base_label = self.ENTAIL_LABEL
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
@@ -159,7 +156,6 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_neutral)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
             base_label = self.ENTAIL_LABEL
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
@@ -168,7 +164,6 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_entail)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
             base_label = self.NEUTRAL_LABEL
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
@@ -177,7 +172,6 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_neutral)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
             base_label = self.NEUTRAL_LABEL
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
@@ -187,7 +181,6 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_entail)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
             base_label = self.NEUTRAL_LABEL
             IIT_label = self.NEUTRAL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
@@ -196,7 +189,6 @@ class IIT_MoNLIDataset:
             example2 = random.choice(word_neutral)
             base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
             source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
-            intervention = self.LEXVAR
             base_label = self.NEUTRAL_LABEL
             IIT_label = self.ENTAIL_LABEL
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
