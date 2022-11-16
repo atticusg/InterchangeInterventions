@@ -127,7 +127,7 @@ class IIT_MoNLIDataset:
 
         def get_intervention(base,source):
             print(base)
-            return min([i if int(base[i]) != (source[i]) else base.shape[0] + 42 for i in range(base.shape[0])])
+            return min([i if int(base[0,i]) != (source[0,i]) else base.shape[1] + 42 for i in range(base.shape[1])])
 
         while True:
             example = random.choice(pmonli_entail)
