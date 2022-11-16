@@ -126,10 +126,9 @@ class IIT_MoNLIDataset:
         word_neutral = pmonli_neutral + nmonli_entail
 
         def get_intervention(base,source):
-            print(base)
-            print(source)
-            print(min([i if int(base[0,i]) != (source[0,i]) else base.shape[1] + 42 for i in range(base.shape[1])]))
-            return min([i if int(base[0,i]) != (source[0,i]) else base.shape[1] + 42 for i in range(base.shape[1])])
+            SEP_ID = 1012
+            SEP_IND = (base.shape[0] == SEP_ID).nonzero(as_tuple=True)[0]
+            return min([i if int(base[0,SEP_IND +i]) != int(base[0,i]) else base.shape[1] + 42 for i in range(base.shape[1])])
 
         while True:
             example = random.choice(pmonli_entail)
