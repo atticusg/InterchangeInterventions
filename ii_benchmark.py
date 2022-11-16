@@ -261,7 +261,7 @@ class IIBenchmarkMoNli(IIBenchmark):
             if X[0][-1] != ".":
                 input = [". ".join(X)]
             else:
-                input = X
+                input = [" ".join(X)]
             data = bert_tokenizer.batch_encode_plus(
                     input,
                     max_length=self.model_parameters['max_length'],
