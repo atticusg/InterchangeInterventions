@@ -258,8 +258,10 @@ class IIBenchmarkMoNli(IIBenchmark):
         bert_tokenizer = BertTokenizer.from_pretrained(self.model_parameters['weights_name'])
 
         def encoding(X):
+            if X[0][-1] != ".":
+                input = [". ".join(X)]
             data = bert_tokenizer.batch_encode_plus(
-                    [" ".join(X)],
+                    ,
                     max_length=self.model_parameters['max_length'],
                     add_special_tokens=True,
                     padding='max_length',
