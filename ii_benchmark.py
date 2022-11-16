@@ -260,8 +260,10 @@ class IIBenchmarkMoNli(IIBenchmark):
         def encoding(X):
             if X[0][-1] != ".":
                 input = [". ".join(X)]
+            else:
+                input = X
             data = bert_tokenizer.batch_encode_plus(
-                    ,
+                    input,
                     max_length=self.model_parameters['max_length'],
                     add_special_tokens=True,
                     padding='max_length',
