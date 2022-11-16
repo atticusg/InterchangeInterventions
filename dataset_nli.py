@@ -206,7 +206,6 @@ class IIT_MoNLIDataset:
             if len(data) > self.size:
                 break
         data.sort(key=lambda x: x[-1])
-        for i in range
 
         base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
         self.base = base
