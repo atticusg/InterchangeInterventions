@@ -17,18 +17,21 @@ def totuple(X):
 def rand_token_id(token_ids):
     return random.choice(token_ids)
 
-def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
+def get_IIT_equality_dataset_all(embed_dim, size, token_ids=None, pool=None):
     V1_dataset = get_IIT_equality_dataset("V1",
                                         embed_dim,
                                         size,
-                                        token_ids =token_ids)
+                                        token_ids=token_ids,
+                                        pool=pool)
     V2_dataset = get_IIT_equality_dataset("V2",
                                         embed_dim,
                                         size,
-                                        token_ids =token_ids)
+                                        token_ids=token_ids,
+                                        pool=pool)
     both_dataset = get_IIT_equality_dataset_both(embed_dim,
                                                 size,
-                                                token_ids =token_ids)
+                                                token_ids=token_ids,
+                                                pool=pool)
     combined_dataset = [torch.cat((V1_dataset[0],
                                     V2_dataset[0],
                                     both_dataset[0])),
@@ -57,11 +60,13 @@ def get_IIT_equality_dataset_all(embed_dim, size, token_ids =None):
                                 for X_source_train in combined_dataset[3]])
     return combined_dataset
 
-def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
+def get_IIT_equality_dataset_both(embed_dim, size, token_ids=None, pool=None):
     train_dataset = IIT_PremackDatasetBoth(
         embed_dim=embed_dim,
         size=size,
-        token_ids=token_ids)
+        token_ids=token_ids,
+        pool=pool,
+    )
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
     X_base_train = torch.tensor(X_base_train)
     X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
@@ -70,14 +75,15 @@ def get_IIT_equality_dataset_both(embed_dim, size, token_ids =None):
     interventions = torch.tensor(interventions)
     return X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions
 
-def get_IIT_equality_dataset_control(key, embed_dim, size, token_ids =None):
+def get_IIT_equality_dataset_control(key, embed_dim, size, token_ids =None, pool=None):
     class_size = size/2
     train_dataset = IIT_PremackDatasetControl(
         key=key,
         embed_dim=embed_dim,
         n_pos=class_size,
         n_neg=class_size,
-        token_ids=token_ids)
+        token_ids=token_ids,
+        pool=pool)
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
     X_base_train = torch.tensor(X_base_train)
     X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
@@ -87,21 +93,23 @@ def get_IIT_equality_dataset_control(key, embed_dim, size, token_ids =None):
     return X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions
 
 
-def get_IIT_equality_dataset(variable, embed_dim, size, token_ids =None):
+def get_IIT_equality_dataset(variable, embed_dim, size, token_ids=None, pool=None):
     class_size = size/2
     train_dataset = IIT_PremackDataset(
         variable,
         embed_dim=embed_dim,
         n_pos=class_size,
         n_neg=class_size,
-        token_ids=token_ids)
+        token_ids=token_ids,
+        pool=pool,
+    )
     X_base_train, y_base_train, X_sources_train,  y_IIT_train, interventions = train_dataset.create()
     X_base_train = torch.tensor(X_base_train)
     X_sources_train = [torch.tensor(X_source_train) for X_source_train in X_sources_train]
     y_base_train = torch.tensor(y_base_train)
     y_IIT_train = torch.tensor(y_IIT_train)
     interventions = torch.tensor(interventions)
-    return X_base_train, y_base_train,X_sources_train,  y_IIT_train, interventions
+    return X_base_train, y_base_train, X_sources_train, y_IIT_train, interventions
 
 def get_equality_dataset(embed_dim, size):
     class_size = size/2
@@ -129,7 +137,7 @@ class PremackDataset:
     NEG_LABEL = 0
 
     def __init__(self, embed_dim=50, n_pos=500, n_neg=500,
-                 flatten_root=True, flatten_leaves=True, intermediate=False):
+                 flatten_root=True, flatten_leaves=True, intermediate=False, pool=None):
         """Creates Premack datasets. Conceptually, the instances are
         (((a, b), (c, d)), label)
         where `label == POS_LABEL` if (a == b) == (c == d), else
@@ -187,6 +195,7 @@ class PremackDataset:
         self.flatten_root = flatten_root
         self.flatten_leaves = flatten_leaves
         self.intermediate = intermediate
+        self.pool = pool
 
     def create(self):
         """Main interface
@@ -274,12 +283,19 @@ class PremackDataset:
         return data
 
     def _create_same_pair(self):
-        vec = randvec(self.embed_dim)
+        if self.pool is not None:
+            vec = random.choice(self.pool[0])[0]
+        else:
+            vec = randvec(self.embed_dim)
         return (vec, vec)
 
     def _create_diff_pair(self):
-        vec1 = randvec(self.embed_dim)
-        vec2 = randvec(self.embed_dim)
+        if self.pool is not None:
+            vec1 = random.choice(self.pool[1])[0]
+            vec2 = random.choice(self.pool[1])[1]
+        else:
+            vec1 = randvec(self.embed_dim)
+            vec2 = randvec(self.embed_dim)
         assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
 
@@ -290,13 +306,16 @@ class IIT_PremackDataset:
     POS_LABEL = 1
     NEG_LABEL = 0
 
-    def __init__(self,
-                variable,
-                embed_dim=50,
-                n_pos=500,
-                n_neg=500,
-                intermediate=False,
-                token_ids = None):
+    def __init__(
+        self,
+        variable,
+        embed_dim=50,
+        n_pos=500,
+        n_neg=500,
+        intermediate=False,
+        token_ids=None,
+        pool=None
+    ):
 
         if token_ids is None:
             self.bert = False
@@ -325,6 +344,9 @@ class IIT_PremackDataset:
         self.n_diff_same_to_diff = int(n_neg / 4)
 
         self.intermediate = intermediate
+        
+        self.pool = pool # pool[0] -> same pool
+                         # pool[1] -> diff pool
 
     def create(self):
         self.data = []
@@ -536,21 +558,30 @@ class IIT_PremackDataset:
 
     def _create_same_pair(self):
         if self.bert:
+            assert False # we are not enabling this for now!
             vec = rand_token_id(self.token_ids)
         else:
-            vec = randvec(self.embed_dim)
+            if self.pool is not None:
+                vec = random.choice(self.pool[0])[0]
+            else:
+                vec = randvec(self.embed_dim)
         return (vec, vec)
 
     def _create_diff_pair(self):
         if self.bert:
+            assert False # we are not enabling this for now!
             while True:
                 vec1 = rand_token_id(self.token_ids)
                 vec2 = rand_token_id(self.token_ids)
                 if not vec1 == vec2:
                     break
         else:
-            vec1 = randvec(self.embed_dim)
-            vec2 = randvec(self.embed_dim)
+            if self.pool is not None:
+                vec1 = random.choice(self.pool[1])[0]
+                vec2 = random.choice(self.pool[1])[1]
+            else:
+                vec1 = randvec(self.embed_dim)
+                vec2 = randvec(self.embed_dim)
             assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
 
@@ -561,13 +592,16 @@ class IIT_PremackDatasetControl:
     POS_LABEL = 1
     NEG_LABEL = 0
 
-    def __init__(self,
-                key={"left":0, "right":0},
-                embed_dim=50,
-                n_pos=500,
-                n_neg=500,
-                intermediate=False,
-                token_ids = None):
+    def __init__(
+        self,
+        key={"left":0, "right":0},
+        embed_dim=50,
+        n_pos=500,
+        n_neg=500,
+        intermediate=False,
+        token_ids=None,
+        pool=None
+    ):
 
         self.key = key
         if token_ids is None:
@@ -590,6 +624,8 @@ class IIT_PremackDatasetControl:
 
         self.intermediate = intermediate
 
+        self.pool = pool
+        
     def create(self):
         if self.key["left"] in [0,1] and self.key["right"] in [0,1]:
             data = self._create_control2()
@@ -867,23 +903,33 @@ class IIT_PremackDatasetControl:
 
     def _create_same_pair(self):
         if self.bert:
+            assert False # we are not enabling this for now!
             vec = rand_token_id(self.token_ids)
         else:
-            vec = randvec(self.embed_dim)
+            if self.pool is not None:
+                vec = random.choice(self.pool[0])[0]
+            else:
+                vec = randvec(self.embed_dim)
         return (vec, vec)
 
     def _create_diff_pair(self):
         if self.bert:
+            assert False # we are not enabling this for now!
             while True:
                 vec1 = rand_token_id(self.token_ids)
                 vec2 = rand_token_id(self.token_ids)
                 if not vec1 == vec2:
                     break
         else:
-            vec1 = randvec(self.embed_dim)
-            vec2 = randvec(self.embed_dim)
+            if self.pool is not None:
+                vec1 = random.choice(self.pool[1])[0]
+                vec2 = random.choice(self.pool[1])[1]
+            else:
+                vec1 = randvec(self.embed_dim)
+                vec2 = randvec(self.embed_dim)
             assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)
+    
 
 class IIT_PremackDatasetBoth:
 
@@ -897,7 +943,8 @@ class IIT_PremackDatasetBoth:
                 size= 1000,
                 embed_dim=50,
                 intermediate=False,
-                token_ids = None):
+                token_ids = None,
+                pool=None):
 
         if token_ids is None:
             self.bert = False
@@ -910,7 +957,9 @@ class IIT_PremackDatasetBoth:
 
 
         self.intermediate = intermediate
-
+        
+        self.pool = pool
+        
     def create(self):
         data = []
         for _ in range(self.size):
@@ -975,20 +1024,29 @@ class IIT_PremackDatasetBoth:
 
     def _create_same_pair(self):
         if self.bert:
+            assert False # we are not enabling this for now!
             vec = rand_token_id(self.token_ids)
         else:
-            vec = randvec(self.embed_dim)
+            if self.pool is not None:
+                vec = random.choice(self.pool[0])[0]
+            else:
+                vec = randvec(self.embed_dim)
         return (vec, vec)
 
     def _create_diff_pair(self):
         if self.bert:
+            assert False # we are not enabling this for now!
             while True:
                 vec1 = rand_token_id(self.token_ids)
                 vec2 = rand_token_id(self.token_ids)
                 if not vec1 == vec2:
                     break
         else:
-            vec1 = randvec(self.embed_dim)
-            vec2 = randvec(self.embed_dim)
+            if self.pool is not None:
+                vec1 = random.choice(self.pool[1])[0]
+                vec2 = random.choice(self.pool[1])[1]
+            else:
+                vec1 = randvec(self.embed_dim)
+                vec2 = randvec(self.embed_dim)
             assert not np.array_equal(vec1, vec2)
         return (vec1, vec2)

@@ -128,7 +128,11 @@ class LayeredIntervenableModel(torch.nn.Module):
             for param in layer["model"].parameters():
                 param.requires_grad = False
                 param.grad = None
-
+        if self.embedding is not None:
+            print("freezing the embedding layer as well.")
+            self.embedding.weight.requires_grad = False
+            self.embedding.weight.grad = None
+        
     def unfreeze_disentangling_parameters(self, layer_num=None):
         """Unfreezes the orthogonal transformations used for disentangling"""
         for i, layer in enumerate(self.labeled_layers):
@@ -140,7 +144,9 @@ class LayeredIntervenableModel(torch.nn.Module):
         for layer in self.labeled_layers:
             for param in layer["model"].parameters():
                 param.requires_grad = True
-
+        if self.embedding is not None:
+            print("unfreezing the embedding layer as well.")
+            self.embedding.weight.requires_grad = True
 
     def forward(self, X):
         """Computes a forward pass with input `X`."""

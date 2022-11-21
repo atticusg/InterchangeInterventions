@@ -30,6 +30,7 @@ class LIMTrainer:
             save_checkpoint_per_epoch=False,
             input_as_ids=False,
             class2index=None,
+            seed=42,
             **optimizer_kwargs):
         """
         Base class for all the PyTorch-based models.
@@ -180,13 +181,15 @@ class LIMTrainer:
         self.params += list(optimizer_kwargs.keys())
         self.class2index = class2index
         self.index2class = {}
-        for k, v in class2index.items():
-            self.index2class[v] = k
+        if class2index is not None:
+            for k, v in class2index.items():
+                self.index2class[v] = k
+        self.seed = seed
         
     def build_iit_dataset(self, base, base_y, iit_data):
         sources, IIT_y, intervention_ids = iit_data
         if not self.input_as_ids:
-            base_x = torch.FloatTensor(np.array(base_x))
+            base = torch.FloatTensor(np.array(base))
             sources = [torch.FloatTensor(np.array(source)) for source in sources]
             
         sources = torch.reshape(
@@ -199,12 +202,20 @@ class LIMTrainer:
         base_y = np.array(base_y)
         self.classes_ = sorted(set(base_y))
         self.n_classes_ = len(self.classes_)
-
-        base_y = [self.class2index[label] for label in base_y]
+        
+        if self.class2index is not None:
+            base_y = [self.class2index[label] for label in base_y]
+        else:
+            class2index = dict(zip(self.classes_, range(self.n_classes_)))
+            base_y = [class2index[label] for label in base_y]
         base_y = torch.tensor(base_y)
 
         IIT_y = np.array(IIT_y)
-        IIT_y = [self.class2index[int(label)] for label in IIT_y]
+        if self.class2index is not None:
+            IIT_y = [self.class2index[int(label)] for label in IIT_y]
+        else:
+            class2index = dict(zip(self.classes_, range(self.n_classes_)))
+            IIT_y = [class2index[int(label)] for label in IIT_y]
         IIT_y = torch.tensor(IIT_y)
 
         dataset = torch.utils.data.TensorDataset(
@@ -218,8 +229,12 @@ class LIMTrainer:
         base_y = np.array(base_y)
         self.classes_ = sorted(set(base_y))
         self.n_classes_ = len(self.classes_)
-
-        base_y = [self.class2index[label] for label in base_y]
+        
+        if self.class2index is not None:
+            base_y = [self.class2index[label] for label in base_y]
+        else:
+            class2index = dict(zip(self.classes_, range(self.n_classes_)))
+            base_y = [class2index[label] for label in base_y]
         base_y = torch.tensor(base_y)
         
         dataset = torch.utils.data.TensorDataset(base_x, base_y)
@@ -384,10 +399,10 @@ class LIMTrainer:
                     self.optimizer.zero_grad()
             
             # Saving checkpoints:
-            
-            if self.save_checkpoint_per_epoch:
-                PATH = f"./saved_models/basemodel-{iteration}.bin"
-                torch.save(self.model.state_dict(), PATH)
+            if iteration % 50 == 0:
+                if self.save_checkpoint_per_epoch:
+                    PATH = f"./saved_models_arithmetic/basemodel-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
+                    torch.save(self.model.state_dict(), PATH)
             
             # Stopping criteria:
 
@@ -585,11 +600,14 @@ class LIMTrainer:
         # Make sure the model is back on the instance device:
         self.model.to(self.device)
         
-        preds = preds.argmax(axis=1)
-        preds = np.array(preds)
-        preds = [self.index2class[label] for label in preds]
-        preds = torch.tensor(preds)
-        
+        if self.class2index is not None:
+            preds = preds.argmax(axis=1)
+            preds = np.array(preds)
+            preds = [self.index2class[label] for label in preds]
+            preds = torch.tensor(preds)
+        else:
+            preds = preds.argmax(axis=1)
+            
         return preds
 
     def iit_predict(self,
@@ -673,11 +691,14 @@ class LIMTrainer:
         self.model.set_device(self.device)
         self.model.device = old_device
 
-        preds = preds.argmax(axis=1)
-        preds = np.array(preds)
-        preds = [self.index2class[label] for label in preds]
-        preds = torch.tensor(preds)
-        
+        if self.class2index is not None:
+            preds = preds.argmax(axis=1)
+            preds = np.array(preds)
+            preds = [self.index2class[label] for label in preds]
+            preds = torch.tensor(preds)
+        else:
+            preds = preds.argmax(axis=1)
+            
         return preds
 
 

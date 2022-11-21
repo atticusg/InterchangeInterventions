@@ -10,6 +10,7 @@ from sklearn.metrics import f1_score
 from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 import sys
 import os
+import torch
 
 __author__ = "Christopher Potts"
 __version__ = "CS224u, Stanford, Spring 2022"
@@ -19,6 +20,94 @@ START_SYMBOL = "<s>"
 END_SYMBOL = "</s>"
 UNK_SYMBOL = "$UNK"
 
+def select_per_chunk(tensor_in, indices):
+    assert tensor_in.shape[0]%3 == 0
+    return torch.cat(
+        [
+            tensor_in[:tensor_in.shape[0]//3][indices],
+            tensor_in[tensor_in.shape[0]//3:2*tensor_in.shape[0]//3][indices],
+            tensor_in[2*tensor_in.shape[0]//3:3*tensor_in.shape[0]//3][indices]
+        ]
+        , dim=0
+    )
+    
+def get_eval_from_train(iit_equality_dataset, n=1000, control=False):
+    if len(iit_equality_dataset) == 2:
+        base_test, y_base_test = iit_equality_dataset
+        indices = torch.randperm(base_test.shape[0])
+        indices = indices[:n]
+        return (
+            base_test[indices], y_base_test[indices]
+        )
+    else:
+        if control:
+            base_test, y_base_test, sources_test, y_IIT_test, intervention_ids_test = iit_equality_dataset
+            indices = torch.randperm(base_test.shape[0]) # within each bucket, we randomize!
+            indices = indices[:n]
+            return (
+                base_test[indices], y_base_test[indices],
+                [s[indices] for s in sources_test], 
+                y_IIT_test[indices], intervention_ids_test[indices]
+            )
+        else:
+            base_test, y_base_test, sources_test, y_IIT_test, intervention_ids_test = iit_equality_dataset
+            indices = torch.randperm(base_test.shape[0]//3) # within each bucket, we randomize!
+            indices = indices[:n]
+            return (
+                select_per_chunk(base_test, indices), 
+                select_per_chunk(y_base_test, indices), 
+                [select_per_chunk(s, indices) for s in sources_test], 
+                select_per_chunk(y_IIT_test, indices),
+                select_per_chunk(intervention_ids_test, indices)
+            )
+
+def generate_shape_pool(embedding_dim, data_size, condition="all"):
+    assert condition == "all"
+    data_size *= 3
+    half_size = data_size // 2
+    
+    same_pool = []
+    diff_pool = []
+    # same
+    for _ in range(half_size):
+        vec = randvec(embedding_dim)
+        same_pool += [(vec, vec)]
+        
+    # diff
+    for _ in range(half_size, data_size):
+        vec_1 = randvec(embedding_dim)
+        vec_2 = randvec(embedding_dim)
+        assert not np.array_equal(vec_1, vec_2)
+        diff_pool += [(vec_1, vec_2)]
+
+    return [same_pool, diff_pool]
+
+def get_factual_task_from_pool(pool):
+    X_base_same = torch.stack([torch.tensor(np.concatenate(example)) for example in pool[0]], dim=0)
+    X_base_diff = torch.stack([torch.tensor(np.concatenate(example)) for example in pool[1]], dim=0)
+    X_base_same_slices = torch.split(X_base_same, [X_base_same.shape[0]//4]*4)
+    X_base_diff_slices = torch.split(X_base_diff, [X_base_diff.shape[0]//4]*4)
+    # same same 1
+    # same diff 0
+    # diff same 0
+    # diff diff 1
+    X_base = []
+    X_base += [torch.cat((X_base_same_slices[0], X_base_same_slices[1]), dim=-1)]
+    X_base += [torch.cat((X_base_same_slices[2], X_base_diff_slices[0]), dim=-1)]
+    X_base += [torch.cat((X_base_diff_slices[1], X_base_same_slices[3]), dim=-1)]
+    X_base += [torch.cat((X_base_diff_slices[2], X_base_diff_slices[3]), dim=-1)]
+    X_base = torch.cat(X_base, dim=0)
+    y_base = [1 for _ in range(X_base_same_slices[0].shape[0])] + \
+    [0 for _ in range(X_base_same_slices[0].shape[0])] + \
+    [0 for _ in range(X_base_same_slices[0].shape[0])] + \
+    [1 for _ in range(X_base_same_slices[0].shape[0])]
+    y_base = torch.tensor(y_base)
+    
+    indices = torch.randperm(X_base.shape[0])
+    X_base = X_base[indices]
+    y_base = y_base[indices]
+    
+    return (X_base, y_base)
 
 def glove2dict(src_filename):
     """
