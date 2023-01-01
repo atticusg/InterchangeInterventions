@@ -4,9 +4,10 @@ from layered_intervenable_model import LayeredIntervenableModel, LinearLayer, In
 from transformers.modeling_outputs import BaseModelOutputWithPastAndCrossAttentions
 
 class SequentialLayers(torch.nn.Module):
-    def __init__(self, *args):
+    def __init__(self, layers, target_dims=None):
         super().__init__()
-        self.layers = args
+        self.layers = layers
+        self.target_dims = target_dims
 
     def forward(self,
                 hidden_states,
@@ -35,16 +36,23 @@ class SequentialLayers(torch.nn.Module):
         args = self.layers[0](*args)
         count = 0
 
-
+        prefix = None
+        suffix = None
         for layer in self.layers[1:]:
             if isinstance(layer, LinearLayer):
                 output = args[0]
                 original_shape = copy.deepcopy(output.shape)
                 output = torch.reshape(output, (original_shape[0], -1))
                 rest = args[1:]
-                args = layer(output)
+                if self.target_dims is None:
+                    args = layer(output)
+                else:
+                    target = output[:,self.target_dims["start"]:self.target_dims["end"]]
+                    prefix = output[:,:self.target_dims["start"]]
+                    suffix = output[:,self.target_dims["end"]:]
+                    args = layer(target)
             elif isinstance(layer, InverseLinearLayer):
-                args = (layer(args).reshape(original_shape), *rest)
+                args = (torch.cat([prefix, layer(args), suffix], 1).reshape(original_shape), *rest)
             else:
                 args = layer(*args)
         return args
@@ -52,9 +60,8 @@ class SequentialLayers(torch.nn.Module):
 
 
 class LIMBertLayer(torch.nn.Module):
-    def __init__(self, bert,layer, final_layer_num):
+    def __init__(self, layer, final_layer_num):
         super().__init__()
-        self.bert = bert
         self.layer = layer
         self.final_layer_num = final_layer_num
 
@@ -73,7 +80,7 @@ class LIMBertLayer(torch.nn.Module):
 
         all_hidden_states = () if output_hidden_states else None
         all_self_attentions = () if output_attentions else None
-        all_cross_attentions = () if output_attentions and self.bert.config.add_cross_attention else None
+        all_cross_attentions = None
 
         next_decoder_cache = () if use_cache else None
         if output_hidden_states:
@@ -81,48 +88,22 @@ class LIMBertLayer(torch.nn.Module):
 
         layer_head_mask = head_mask[layer_num] if head_mask is not None else None
         past_key_value = past_key_values[layer_num] if past_key_values is not None else None
-        #PUSHTHIS TO GIT
-        if getattr(self.bert.config, "gradient_checkpointing", False) and self.bert.training:
 
-            if use_cache:
-                logger.warning(
-                    "`use_cache=True` is incompatible with `config.gradient_checkpointing=True`. Setting "
-                    "`use_cache=False`..."
-                )
-                use_cache = False
+        layer_outputs = self.layer(
+            hidden_states,
+            attention_mask,
+            layer_head_mask,
+            encoder_hidden_states,
+            encoder_attention_mask,
+            past_key_value,
+            output_attentions,
+        )
 
-            def create_custom_forward(module):
-                def custom_forward(*inputs):
-                    return module(*inputs, past_key_value, output_attentions)
-
-                return custom_forward
-
-            layer_outputs = torch.utils.checkpoint.checkpoint(
-                                        create_custom_forward(layer_module),
-                                        hidden_states,
-                                        attention_mask,
-                                        layer_head_mask,
-                                        encoder_hidden_states,
-                                        encoder_attention_mask,
-                                        )
-        else:
-            layer_outputs = self.layer(
-                hidden_states,
-                attention_mask,
-                layer_head_mask,
-                encoder_hidden_states,
-                encoder_attention_mask,
-                past_key_value,
-                output_attentions,
-            )
-
-            hidden_states = layer_outputs[0]
-            if use_cache:
-                next_decoder_cache += (layer_outputs[-1],)
-            if output_attentions:
-                all_self_attentions = all_self_attentions + (layer_outputs[1],)
-                if self.bert.config.add_cross_attention:
-                    all_cross_attentions = all_cross_attentions + (layer_outputs[2],)
+        hidden_states = layer_outputs[0]
+        if use_cache:
+            next_decoder_cache += (layer_outputs[-1],)
+        if output_attentions:
+            all_self_attentions = all_self_attentions + (layer_outputs[1],)
 
         if output_hidden_states:
             all_hidden_states = all_hidden_states + (hidden_states,)
@@ -168,36 +149,46 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 max_length=20,
                 device=None,
                 use_wrapper=True,
-                debug=False):
-        super().__init__(debug=debug, use_wrapper=use_wrapper)
+                debug=False,
+                target_dims=None,
+                target_layers=None
+                ):
+        super().__init__(
+            debug=debug,
+            use_wrapper=use_wrapper,
+            target_dims=target_dims,
+            target_layers=target_layers,
+            device=device
+        )
+        
         self.combiner = SequentialLayers
         self.n_classes = n_classes
-        self.bert = bert
-        self.bert.train()
-        self.hidden_dim = self.bert.embeddings.word_embeddings.embedding_dim
-        n = self.hidden_dim*max_length
+        self.hidden_dim = bert.embeddings.word_embeddings.embedding_dim
+        self.model_dim = self.hidden_dim*max_length
+        if self.target_dims is not None:
+            self.model_dim = self.target_dims["end"]-self.target_dims["start"]
 
-
-        self.model_dims = [n]
+        self.embeddings = bert.embeddings
         self.model_layers = torch.nn.ModuleList()
-        for layer in self.bert.encoder.layer:
-            self.model_layers.append(LIMBertLayer(bert, layer, len(self.bert.encoder.layer)-1))
-            self.model_dims.append(n)
+        for layer in bert.encoder.layer:
+            self.model_layers.append(LIMBertLayer(layer, len(bert.encoder.layer)-1))
+        self.get_extended_attention_mask = bert.get_extended_attention_mask
         self.classifier_layer = torch.nn.Linear(self.hidden_dim, self.n_classes)
-
-        self.build_graph(self.model_layers, self.model_dims)
-
+        self.pooler = bert.pooler
+        self.build_graph(self.model_layers, self.model_dim)
 
     def forward(self, pair):
         """Computes a forward pass with input `X`."""
         X, mask = pair
+        input_shape = X.size()
+        extended_attention_mask = self.get_extended_attention_mask(mask, input_shape)
+        X = self.embeddings(X)
         if self.analysis:
-            self.bert.encoder = self.analysis_model
+            output = self.analysis_model(X, attention_mask=extended_attention_mask)[0]
         else:
-            self.bert.encoder =  self.normal_model
-        output = self.bert(X, mask).pooler_output
-        output = self.classifier_layer(output)
-        return output
+            output = self.normal_model(X, attention_mask=extended_attention_mask)[0]
+        pooler_output = self.pooler(output)
+        return self.classifier_layer(pooler_output)
 
     def iit_forward(self,
             base_pair,

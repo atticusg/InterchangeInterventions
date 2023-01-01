@@ -27,7 +27,12 @@ class LinearLayer(torch.nn.Module):
         return torch.matmul(x, self.weight)
 
 class LayeredIntervenableModel(torch.nn.Module):
-    def __init__(self, device=None, debug=False, use_wrapper=False):
+    def __init__(self,
+            device=None,
+            debug=False,
+            use_wrapper=False,
+            target_dims=None,
+            target_layers=None):
         """
 
         Base class for all the PyTorch-based models.
@@ -60,22 +65,26 @@ class LayeredIntervenableModel(torch.nn.Module):
             three times the length of `labeled_layers`
         """
         super().__init__()
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        device = device if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
         self.debug = debug
         self.combiner = torch.nn.Sequential
         self.use_wrapper = use_wrapper
+        self.target_dims = target_dims
+        self.target_layers = target_layers
 
-    def build_graph(self, model_layers, model_layer_dims):
+    def build_graph(self, model_layers, model_layer_dim):
         self.analysis_model = torch.nn.ModuleList()
         self.normal_model = torch.nn.ModuleList()
         self.labeled_layers = []
+        
         # Initialize the orthogonal transformations used for disentanglement
         for index, model_layer in enumerate(model_layers[:-1]):
             self.normal_model.append(model_layer)
             self.analysis_model.extend([model_layer])
-            if not self.debug:
-                lin_layer = LinearLayer(model_layer_dims[index+1],
+            
+            if not self.debug and (self.target_layers is None or index in self.target_layers):
+                lin_layer = LinearLayer(model_layer_dim,
                                         self.device)
                 lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
                 inverse_lin_layer = InverseLinearLayer(lin_layer)
@@ -84,22 +93,26 @@ class LayeredIntervenableModel(torch.nn.Module):
             else:
                 self.labeled_layers.append({"model":model_layer})
 
-
-
         self.labeled_layers.append({"model":model_layers[-1]})
         self.normal_model.extend([model_layers[-1]])
         self.analysis_model.extend([model_layers[-1]])
-
-        self.normal_model = self.combiner(*self.normal_model)
-        self.analysis_model = self.combiner(*self.analysis_model)
+        
+        if self.target_dims is None:
+            self.normal_model = self.combiner(self.normal_model)
+            self.analysis_model = self.combiner(self.analysis_model)
+        else:
+            self.normal_model = self.combiner(self.normal_model,
+                                                    target_dims = self.target_dims)
+            self.analysis_model = self.combiner(self.analysis_model,
+                                                    target_dims = self.target_dims)
 
         self.set_analysis_mode(False)
 
 
-    def set_analysis_mode(self, mode):
+    def set_analysis_mode(self, mode, layers=None):
         self.analysis = mode
         if self.analysis:
-            self.unfreeze_disentangling_parameters()
+            self.unfreeze_disentangling_parameters(layers=layers)
             self.freeze_model_parameters()
         else:
             self.freeze_disentangling_parameters()
@@ -128,34 +141,32 @@ class LayeredIntervenableModel(torch.nn.Module):
             for param in layer["model"].parameters():
                 param.requires_grad = False
                 param.grad = None
-        if self.embedding is not None:
-            print("freezing the embedding layer as well.")
-            self.embedding.weight.requires_grad = False
-            self.embedding.weight.grad = None
-        
-    def unfreeze_disentangling_parameters(self, layer_num=None):
+
+    def unfreeze_disentangling_parameters(self, layers=None):
         """Unfreezes the orthogonal transformations used for disentangling"""
         for i, layer in enumerate(self.labeled_layers):
-            if "disentangle" in layer and (layer_num is None or layer_num == i):
+            if "disentangle" in layer and (layers is None or i in layers):
                 layer["disentangle"].parametrizations.weight.original.requires_grad = True
+
 
     def unfreeze_model_parameters(self):
         """Unfreezes the model weights (for training purposes)"""
         for layer in self.labeled_layers:
             for param in layer["model"].parameters():
                 param.requires_grad = True
-        if self.embedding is not None:
-            print("unfreezing the embedding layer as well.")
-            self.embedding.weight.requires_grad = True
+
+    def analyze_disentanglement(id_to_coords):
+        result = dict()
+        for layer_num in id_to_coords:
+            lin = self.labeled_layers[layer_num]["disentangle"]
+            ortho_trans = lin.parametrizations.weight.original
+            id = torch.eye(lin.parametrizations.weight.original.shape[0])
+            start, end = id_to_coords[layer_num]["start"], id_to_coords[layer_num]["end"]
+            result[layer_num] = orthogonal_trans(id[:, start:end])
+        return result
 
     def forward(self, X):
         """Computes a forward pass with input `X`."""
-        if self.embedding is not None:
-            bs = X.shape[0]
-            X = X - 1
-            X = self.embedding(X)
-            X = X.view(bs, -1)
-
         if self.analysis:
             return self.analysis_model(X)
         else:
@@ -174,7 +185,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         integers to coordinates denoting the layer, start index, and end index.
         """
         #unstack sources
-        sources = [sources[:,j,:].squeeze(1).to(self.device)
+        sources = [sources[:,j,:].squeeze(1).type(torch.FloatTensor).to(self.device)
            for j in range(sources.shape[1])]
         #translate intervention_ids to coordinates
         gets =  intervention_ids_to_coords[int(intervention_ids.flatten()[0])]
@@ -184,7 +195,10 @@ class LayeredIntervenableModel(torch.nn.Module):
         #retrieve the value of interventions by feeding in the source inputs
         for i, get in enumerate(gets):
             handlers = self._gets_sets(gets =[get],sets = None)
-            source_logits = self.forward(sources[i])
+            # NOTE: not sure why we need a new source for every alignment location,
+            # so changing this to just take the first (and only?) source
+            # source_logits = self.forward(sources[i])
+            source_logits = self.forward(sources[0])
             for handler in handlers:
                 handler.remove()
             sets[i]["intervention"] =\
@@ -255,6 +269,9 @@ class LayeredIntervenableModel(torch.nn.Module):
                 hook = self.make_hook(gets,sets, layer_num)
                 if "disentangle" in layer:
                     handler = layer["disentangle"].register_forward_hook(hook)
+                else:
+                    hook = self.make_hook(gets,sets, layer_num, use_wrapper=self.use_wrapper)
+                    handler = layer["model"].register_forward_hook(hook)
             else:
                 hook = self.make_hook(gets,sets, layer_num, use_wrapper=self.use_wrapper)
                 handler = layer["model"].register_forward_hook(hook)
