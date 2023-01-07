@@ -30,7 +30,20 @@ def select_per_chunk(tensor_in, indices):
         ]
         , dim=0
     )
-    
+
+def get_eval_from_train_monli(iit_equality_dataset, n=1000, control=False):
+    if control:
+        base_test, y_base_test, sources_test, y_IIT_test, intervention_ids_test = iit_equality_dataset
+        indices = torch.randperm(base_test.shape[0]) # within each bucket, we randomize!
+        indices = indices[:n]
+        return (
+            (base_test[0][indices], base_test[1][indices]), y_base_test[indices],
+            [(sources_test[0][0][indices], sources_test[0][1][indices])], 
+            y_IIT_test[indices], intervention_ids_test[indices]
+        )
+    else:
+        pass
+
 def get_eval_from_train(iit_equality_dataset, n=1000, control=False):
     if len(iit_equality_dataset) == 2:
         base_test, y_base_test = iit_equality_dataset

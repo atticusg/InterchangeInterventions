@@ -151,7 +151,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 use_wrapper=True,
                 debug=False,
                 target_dims=None,
-                target_layers=None
+                target_layers=None,
                 ):
         super().__init__(
             debug=debug,
@@ -163,11 +163,12 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         
         self.combiner = SequentialLayers
         self.n_classes = n_classes
+        self.num_layers = 12
         self.hidden_dim = bert.embeddings.word_embeddings.embedding_dim
         self.model_dim = self.hidden_dim*max_length
         if self.target_dims is not None:
             self.model_dim = self.target_dims["end"]-self.target_dims["start"]
-
+        
         self.embeddings = bert.embeddings
         self.model_layers = torch.nn.ModuleList()
         for layer in bert.encoder.layer:
@@ -175,6 +176,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         self.get_extended_attention_mask = bert.get_extended_attention_mask
         self.classifier_layer = torch.nn.Linear(self.hidden_dim, self.n_classes)
         self.pooler = bert.pooler
+        
         self.build_graph(self.model_layers, self.model_dim)
 
     def forward(self, pair):

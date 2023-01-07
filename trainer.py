@@ -267,7 +267,10 @@ class LIMTrainer:
              base_labels,
              iit_data=None,
              intervention_ids_to_coords=None,
-             device=None):
+             device=None,
+             save_checkpoint_per_epoch_overwrite=False,
+             save_checkpoint_prefix=None,
+           ):
         """
         Generic optimization method.
 
@@ -398,6 +401,9 @@ class LIMTrainer:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
             
+            if save_checkpoint_per_epoch_overwrite:
+                PATH = f"{save_checkpoint_prefix}-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
+                torch.save(self.model.state_dict(), PATH)
             # Saving checkpoints:
             if iteration % 50 == 0:
                 if self.save_checkpoint_per_epoch:
@@ -513,7 +519,7 @@ class LIMTrainer:
             dataset,
             batch_size=self.batch_size,
             shuffle=shuffle,
-            pin_memory=True,
+            pin_memory=False,
             collate_fn=collate_fn)
         return dataloader
 
@@ -833,11 +839,13 @@ class BERTLIMTrainer(LIMTrainer):
                                                 intervention_ids)
         return dataset
 
-    def process_batch(self,batch):
+    def process_batch(self, batch, device=None):
+        if device == None:
+            device = self.device
         # cast tensors to trainer device
         return (
-            (batch[0].squeeze().to(self.device), batch[1].squeeze().to(self.device)),
-            batch[2].to(self.device)
+            (batch[0].squeeze().to(device), batch[1].squeeze().to(device)),
+            batch[2].to(device)
         )
 
     def predict(self, X_base, device=None):
@@ -877,7 +885,7 @@ class BERTLIMTrainer(LIMTrainer):
         with torch.no_grad():
             for batch_num, batch in enumerate(dataloader, start=1):
                 batch = [x.to(device, non_blocking=True) for x in batch]
-                base_batch, base_labels_batch = self.process_batch(batch)
+                base_batch, base_labels_batch = self.process_batch(batch, device=device)
                 batch_preds = self.model.forward(
                                 base_batch)
                 if preds is None:

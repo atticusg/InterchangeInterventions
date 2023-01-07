@@ -29,11 +29,6 @@ class IIBenchmark:
         self.training_parameters = training_parameters
         self.seed = seed
 
-        utils.fix_random_seeds()
-
-        # self.train_dataset, self.test_dataset = self.load_datasets()
-
-
     def load_datasets(self):
         return
 
@@ -297,9 +292,9 @@ class IIBenchmarkMoNli(IIBenchmark):
         iit_MoNLI_test = dataset_nli.get_IIT_MoNLI_dataset(encoding, 'test', self.data_parameters['test_size'])
         return iit_MoNLI_test
 
-    def create_model(self):
+    def create_model(self, oracle_model=None):
         bert = BertModel.from_pretrained(self.model_parameters['weights_name'])
-
+            
         return LIMBERTClassifier(
             self.model_parameters['n_classes'],
             bert,
@@ -307,7 +302,7 @@ class IIBenchmarkMoNli(IIBenchmark):
             debug=self.model_parameters['debug'],
             target_dims = self.model_parameters['target_dims'],
             target_layers=self.model_parameters['target_layers'],
-            device=self.model_parameters['device']
+            device=self.model_parameters['device'],
         )
 
     def create_classifier(self, model):
