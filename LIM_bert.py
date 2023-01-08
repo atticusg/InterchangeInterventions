@@ -179,6 +179,29 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         
         self.build_graph(self.model_layers, self.model_dim)
 
+    def freeze_model_parameters(self):
+        """Freezes the model weights (for analysis purposes)"""
+        for param in self.embeddings.parameters():
+            param.requires_grad = False
+            param.grad = None
+        for param in self.classifier_layer.parameters():
+            param.requires_grad = False
+            param.grad = None
+        for param in self.pooler.parameters():
+            param.requires_grad = False
+            param.grad = None
+        super().freeze_model_parameters()
+        
+    def unfreeze_model_parameters(self):
+        """Unfreezes the model weights (for training purposes)"""
+        for param in self.embeddings.parameters():
+            param.requires_grad = True
+        for param in self.classifier_layer.parameters():
+            param.requires_grad = True
+        for param in self.pooler.parameters():
+            param.requires_grad = True
+        super().freeze_model_parameters()
+        
     def forward(self, pair):
         """Computes a forward pass with input `X`."""
         X, mask = pair

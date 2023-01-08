@@ -306,7 +306,8 @@ class IIT_MoNLIDataset:
                 ))
             
         data.sort(key=lambda x: x[-1])
-
+        random.shuffle(data)
+        
         base, base_mask, y, source1, source2, source1_mask, source2_mask, IIT_y, interventions = zip(*data)
         self.base = base
         self.base_mask = base_mask
@@ -435,7 +436,8 @@ class IIT_MoNLIDataset:
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
             
         data.sort(key=lambda x: x[-1])
-
+        random.shuffle(data)
+        
         base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
         self.base = base
         self.base_mask = base_mask
@@ -444,7 +446,7 @@ class IIT_MoNLIDataset:
         self.y = np.array(y)
         self.IIT_y = np.array(IIT_y)
         self.interventions = np.array(interventions)
-        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask), (self.source,self.source_mask)], self.IIT_y, self.interventions
+        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask)], self.IIT_y, self.interventions
     
     def create_neghyp_V2(
         self,
@@ -559,7 +561,8 @@ class IIT_MoNLIDataset:
             data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
             
         data.sort(key=lambda x: x[-1])
-
+        random.shuffle(data)
+        
         base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
         self.base = base
         self.base_mask = base_mask
@@ -568,4 +571,4 @@ class IIT_MoNLIDataset:
         self.y = np.array(y)
         self.IIT_y = np.array(IIT_y)
         self.interventions = np.array(interventions)
-        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask), (self.source,self.source_mask)], self.IIT_y, self.interventions
+        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask)], self.IIT_y, self.interventions
