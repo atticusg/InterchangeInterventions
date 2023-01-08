@@ -178,7 +178,274 @@ class IIT_MoNLIDataset:
         self.base_mask = base_mask
         self.y = np.array(y)
         return (self.base, self.base_mask), self.y
+    
+    def create_neghyp_V1_V2(
+        self,
+        pmonli_entail=[],
+        pmonli_neutral=[],
+        nmonli_entail=[],
+        nmonli_neutral=[]
+    ):
+        if len(pmonli_entail) == 0:
+            pmonli_entail = []
+            pmonli_neutral = []
+            nmonli_entail = []
+            nmonli_neutral = []
+            with open(os.path.join("datasets", "pmonli.jsonl")) as f:
+                for line in f.readlines():
+                    example = json.loads(line)
+                    if example["gold_label"] == "entailment":
+                        pmonli_entail.append(example)
+                    else:
+                        pmonli_neutral.append(example)
+            with open(os.path.join(f"datasets", f"nmonli_{self.suffix}.jsonl")) as f:
+                for line in f.readlines():
+                    example = json.loads(line)
+                    if example["gold_label"] == "entailment":
+                        nmonli_entail.append(example)
+                    else:
+                        nmonli_neutral.append(example)
+            k = self.size // 8
+            pmonli_entail = sample_k_elements(pmonli_entail, k)
+            pmonli_neutral = sample_k_elements(pmonli_neutral, k)
+            nmonli_entail = sample_k_elements(nmonli_entail, k)
+            nmonli_neutral = sample_k_elements(nmonli_neutral, k)
+            
+        pool_dict = {
+            "pmonli_entail": pmonli_entail,
+            "pmonli_neutral": pmonli_neutral,
+            "nmonli_entail": nmonli_entail,
+            "nmonli_neutral": nmonli_neutral,
+        }
         
+        data = []
+
+        word_pos = pmonli_entail + pmonli_neutral # 1
+        word_neg = nmonli_neutral + nmonli_entail # 0
+        word_entail = pmonli_entail + nmonli_neutral # 1
+        word_neutral = pmonli_neutral + nmonli_entail # 0
+        
+        def get_intervention():
+            return 2
+        
+        for i in range(len(pmonli_entail)):
+            example = pmonli_entail[i]
+            for _ in range(2):
+                pos = random.choice([True, False])
+                entail = random.choice([True, False])
+                example2 = random.choice(word_pos) if pos else random.choice(word_neg)
+                example3 = random.choice(word_entail) if entail else random.choice(word_neutral)
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                base_label = self.ENTAIL_LABEL
+                source1, source1_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                source2, source2_mask = self.embed_func([example3["sentence1"], example3["sentence2"]])
+                intervention = get_intervention()
+                IIT_label = self.ENTAIL_LABEL if pos == entail else self.NEUTRAL_LABEL
+                data.append((
+                    base, base_mask, base_label, 
+                    source1, source2, source1_mask, source2_mask, 
+                    IIT_label, intervention
+                ))
+
+
+        for i in range(len(nmonli_entail)):
+            example = nmonli_entail[i]
+            for _ in range(2):
+                pos = random.choice([True, False])
+                entail = random.choice([True, False])
+                example2 = random.choice(word_pos) if pos else random.choice(word_neg)
+                example3 = random.choice(word_entail) if entail else random.choice(word_neutral)
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                base_label = self.ENTAIL_LABEL
+                source1, source1_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                source2, source2_mask = self.embed_func([example3["sentence1"], example3["sentence2"]])
+                intervention = get_intervention()
+                IIT_label = self.ENTAIL_LABEL if pos == entail else self.NEUTRAL_LABEL
+                data.append((
+                    base, base_mask, base_label, 
+                    source1, source2, source1_mask, source2_mask, 
+                    IIT_label, intervention
+                ))
+    
+        for i in range(len(pmonli_neutral)):
+            example = pmonli_neutral[i]
+            for _ in range(2):
+                pos = random.choice([True, False])
+                entail = random.choice([True, False])
+                example2 = random.choice(word_pos) if pos else random.choice(word_neg)
+                example3 = random.choice(word_entail) if entail else random.choice(word_neutral)
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                base_label = self.NEUTRAL_LABEL
+                source1, source1_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                source2, source2_mask = self.embed_func([example3["sentence1"], example3["sentence2"]])
+                intervention = get_intervention()
+                IIT_label = self.ENTAIL_LABEL if pos == entail else self.NEUTRAL_LABEL
+                data.append((
+                    base, base_mask, base_label, 
+                    source1, source2, source1_mask, source2_mask, 
+                    IIT_label, intervention
+                ))
+
+        for i in range(len(nmonli_neutral)):
+            example = nmonli_neutral[i]
+            for _ in range(2):
+                pos = random.choice([True, False])
+                entail = random.choice([True, False])
+                example2 = random.choice(word_pos) if pos else random.choice(word_neg)
+                example3 = random.choice(word_entail) if entail else random.choice(word_neutral)
+                base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                base_label = self.NEUTRAL_LABEL
+                source1, source1_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                source2, source2_mask = self.embed_func([example3["sentence1"], example3["sentence2"]])
+                intervention = get_intervention()
+                IIT_label = self.ENTAIL_LABEL if pos == entail else self.NEUTRAL_LABEL
+                data.append((
+                    base, base_mask, base_label, 
+                    source1, source2, source1_mask, source2_mask, 
+                    IIT_label, intervention
+                ))
+            
+        data.sort(key=lambda x: x[-1])
+
+        base, base_mask, y, source1, source2, source1_mask, source2_mask, IIT_y, interventions = zip(*data)
+        self.base = base
+        self.base_mask = base_mask
+        self.source1 = source1
+        self.source1_mask = source1_mask
+        self.source2 = source2
+        self.source2_mask = source2_mask
+        self.y = np.array(y)
+        self.IIT_y = np.array(IIT_y)
+        self.interventions = np.array(interventions)
+        return (self.base, self.base_mask), self.y, \
+            [(self.source1,self.source1_mask), (self.source2,self.source2_mask)], \
+            self.IIT_y, self.interventions
+        
+    
+    def create_neghyp_V1(
+        self,
+        pmonli_entail=[],
+        pmonli_neutral=[],
+        nmonli_entail=[],
+        nmonli_neutral=[]
+    ):
+        if len(pmonli_entail) == 0:
+            pmonli_entail = []
+            pmonli_neutral = []
+            nmonli_entail = []
+            nmonli_neutral = []
+            with open(os.path.join("datasets", "pmonli.jsonl")) as f:
+                for line in f.readlines():
+                    example = json.loads(line)
+                    if example["gold_label"] == "entailment":
+                        pmonli_entail.append(example)
+                    else:
+                        pmonli_neutral.append(example)
+            with open(os.path.join(f"datasets", f"nmonli_{self.suffix}.jsonl")) as f:
+                for line in f.readlines():
+                    example = json.loads(line)
+                    if example["gold_label"] == "entailment":
+                        nmonli_entail.append(example)
+                    else:
+                        nmonli_neutral.append(example)
+            k = self.size // 8
+            pmonli_entail = sample_k_elements(pmonli_entail, k)
+            pmonli_neutral = sample_k_elements(pmonli_neutral, k)
+            nmonli_entail = sample_k_elements(nmonli_entail, k)
+            nmonli_neutral = sample_k_elements(nmonli_neutral, k)
+            
+        data = []
+
+        word_pos = pmonli_entail + pmonli_neutral
+        word_neg = nmonli_neutral + nmonli_entail
+    
+        def get_intervention(base,source):
+            return 0
+        
+        for i in range(len(pmonli_entail)):
+            example = pmonli_entail[i]
+            example2 = random.choice(word_pos)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.ENTAIL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+            example2 = random.choice(word_neg)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+        
+        for i in range(len(nmonli_entail)):
+            example = nmonli_entail[i]
+            example2 = random.choice(word_pos)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+            example2 = random.choice(word_neg)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.ENTAIL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.ENTAIL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+    
+        for i in range(len(pmonli_neutral)):
+            example = pmonli_neutral[i]
+            example2 = random.choice(word_pos)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+            example2 = random.choice(word_neg)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.ENTAIL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+        for i in range(len(nmonli_neutral)):
+            example = nmonli_neutral[i]
+            example2 = random.choice(word_pos)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.ENTAIL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+            example2 = random.choice(word_neg)
+            base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+            source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+            base_label = self.NEUTRAL_LABEL
+            intervention = get_intervention(base,source)
+            IIT_label = self.NEUTRAL_LABEL
+            data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+            
+        data.sort(key=lambda x: x[-1])
+
+        base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
+        self.base = base
+        self.base_mask = base_mask
+        self.source = source
+        self.source_mask = source_mask
+        self.y = np.array(y)
+        self.IIT_y = np.array(IIT_y)
+        self.interventions = np.array(interventions)
+        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask), (self.source,self.source_mask)], self.IIT_y, self.interventions
+    
     def create_neghyp_V2(
         self,
         pmonli_entail=[],
@@ -301,4 +568,4 @@ class IIT_MoNLIDataset:
         self.y = np.array(y)
         self.IIT_y = np.array(IIT_y)
         self.interventions = np.array(interventions)
-        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask)], self.IIT_y, self.interventions
+        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask), (self.source,self.source_mask)], self.IIT_y, self.interventions

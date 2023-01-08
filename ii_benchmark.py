@@ -248,7 +248,8 @@ class IIBenchmarkMoNli(IIBenchmark):
             training_parameters,
             seed
         )
-        self.bert_tokenizer = BertTokenizer.from_pretrained(self.model_parameters['weights_name'])
+        self.bert_tokenizer = BertTokenizer.from_pretrained(self.model_parameters['weights_name'], 
+                                                            cache_dir="./huggingface_cache")
 
     def load_train_datasets(self):
         
@@ -293,7 +294,8 @@ class IIBenchmarkMoNli(IIBenchmark):
         return iit_MoNLI_test
 
     def create_model(self, oracle_model=None):
-        bert = BertModel.from_pretrained(self.model_parameters['weights_name'])
+        bert = BertModel.from_pretrained(self.model_parameters['weights_name'], 
+                                         cache_dir="./huggingface_cache")
             
         return LIMBERTClassifier(
             self.model_parameters['n_classes'],
