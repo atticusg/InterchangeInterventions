@@ -179,6 +179,312 @@ class IIT_MoNLIDataset:
         self.y = np.array(y)
         return (self.base, self.base_mask), self.y
     
+    def create_tokenidentity_V1(
+        self,
+        pmonli_entail=[],
+        pmonli_neutral=[],
+        nmonli_entail=[],
+        nmonli_neutral=[]
+    ):
+        pmonli_entail = []
+        pmonli_neutral = []
+        nmonli_entail = []
+        nmonli_neutral = []
+        with open(os.path.join("datasets", "pmonli.jsonl")) as f:
+            for line in f.readlines():
+                example = json.loads(line)
+                if example["gold_label"] == "entailment":
+                    pmonli_entail.append(example)
+                else:
+                    pmonli_neutral.append(example)
+        with open(os.path.join(f"datasets", f"nmonli_train.jsonl")) as f:
+            for line in f.readlines():
+                example = json.loads(line)
+                if example["gold_label"] == "entailment":
+                    nmonli_entail.append(example)
+                else:
+                    nmonli_neutral.append(example)
+
+        example_dedup = set([])
+        for example in pmonli_entail+pmonli_neutral+nmonli_entail+nmonli_neutral:
+            example_dedup.add(example['sentence1']+example['sentence2'])
+
+        for example in pmonli_entail:
+            if example['sentence1']+example['sentence2'] in example_dedup:
+                continue
+            example_dedup.add(example['sentence1']+example['sentence2'])
+            new_example = {}
+            new_example['sentence1'] = example['sentence2']
+            new_example['sentence2'] = example['sentence1']
+            new_example['sentence1_lex'] = example['sentence2_lex'] 
+            new_example['sentence2_lex'] = example['sentence1_lex'] 
+            new_example['gold_label'] = 'neutral'
+            new_example['depth'] = example['depth']
+            if new_example['sentence1']+new_example['sentence2'] not in example_dedup:
+                pmonli_neutral.append(new_example)
+                example_dedup.add(new_example['sentence1']+new_example['sentence2'])
+
+        for example in pmonli_neutral:
+            if example['sentence1']+example['sentence2'] in example_dedup:
+                continue
+            example_dedup.add(example['sentence1']+example['sentence2'])
+            new_example = {}
+            new_example['sentence1'] = example['sentence2']
+            new_example['sentence2'] = example['sentence1']
+            new_example['sentence1_lex'] = example['sentence2_lex'] 
+            new_example['sentence2_lex'] = example['sentence1_lex'] 
+            new_example['gold_label'] = 'entailment'
+            new_example['depth'] = example['depth']
+            if new_example['sentence1']+new_example['sentence2'] not in example_dedup:
+                pmonli_entail.append(new_example)
+                example_dedup.add(new_example['sentence1']+new_example['sentence2'])
+
+        for example in nmonli_entail:
+            if example['sentence1']+example['sentence2'] in example_dedup:
+                continue
+            example_dedup.add(example['sentence1']+example['sentence2'])
+            new_example = {}
+            new_example['sentence1'] = example['sentence2']
+            new_example['sentence2'] = example['sentence1']
+            new_example['sentence1_lex'] = example['sentence2_lex'] 
+            new_example['sentence2_lex'] = example['sentence1_lex'] 
+            new_example['gold_label'] = 'neutral'
+            new_example['depth'] = example['depth']
+            if new_example['sentence1']+new_example['sentence2'] not in example_dedup:
+                nmonli_neutral.append(new_example)
+                example_dedup.add(new_example['sentence1']+new_example['sentence2'])
+
+        for example in nmonli_neutral:
+            if example['sentence1']+example['sentence2'] in example_dedup:
+                continue
+            example_dedup.add(example['sentence1']+example['sentence2'])
+            new_example = {}
+            new_example['sentence1'] = example['sentence2']
+            new_example['sentence2'] = example['sentence1']
+            new_example['sentence1_lex'] = example['sentence2_lex'] 
+            new_example['sentence2_lex'] = example['sentence1_lex'] 
+            new_example['gold_label'] = 'entailment'
+            new_example['depth'] = example['depth']
+            if new_example['sentence1']+new_example['sentence2'] not in example_dedup:
+                nmonli_entail.append(new_example)
+                example_dedup.add(new_example['sentence1']+new_example['sentence2'])
+
+        word_entail = pmonli_entail + nmonli_neutral
+        word_neutral = pmonli_neutral + nmonli_entail
+        word_pos = pmonli_entail + pmonli_neutral # 1
+        word_neg = nmonli_neutral + nmonli_entail # 0
+        all_examples = word_entail + word_neutral
+
+        word_to_sentences_mapping = {}
+        for example in all_examples:
+            if example["sentence1_lex"] in word_to_sentences_mapping:
+                word_to_sentences_mapping[example["sentence1_lex"]].add(example['sentence1'])
+            else:
+                word_to_sentences_mapping[example["sentence1_lex"]] = set([example['sentence1']])
+            if example["sentence2_lex"] in word_to_sentences_mapping:
+                word_to_sentences_mapping[example["sentence2_lex"]].add(example['sentence2'])
+            else:
+                word_to_sentences_mapping[example["sentence2_lex"]] = set([example['sentence2']])
+
+        entail_pairs = list(set((pair["sentence1_lex"], pair["sentence2_lex"]) for pair in word_entail))
+        neutral_pairs = list(set((pair["sentence1_lex"], pair["sentence2_lex"]) for pair in word_neutral))
+
+        word_to_entail_mapping = {}
+        for pair in entail_pairs:
+            if pair[0] in word_to_entail_mapping:
+                word_to_entail_mapping[pair[0]].append(pair[1])
+            else:
+                word_to_entail_mapping[pair[0]] = [pair[1]]
+
+        word_to_neutral_mapping = {}
+        for pair in neutral_pairs:
+            if pair[0] in word_to_neutral_mapping:
+                word_to_neutral_mapping[pair[0]].append(pair[1])
+            else:
+                word_to_neutral_mapping[pair[0]] = [pair[1]]
+        all_vocab = list(word_to_sentences_mapping.keys())
+        
+        data = []
+
+        def get_intervention():
+            return 1
+        
+        label_flipped_data = []
+        label_unflipped_data = []
+        
+        while len(label_flipped_data) < self.size:
+            pos = random.choice([True, False])
+            if pos:
+                example = random.choice(word_pos)
+                entail = random.choice([True, False])
+                if entail and example['sentence1_lex'] in word_to_entail_mapping:
+                    entail_candidates = word_to_entail_mapping[example['sentence1_lex']]
+                    entail_candidate = random.choice(entail_candidates)
+                    # make it super hard, an random template?
+                    random_template_word = random.choice(all_vocab)
+                    sentence2 = random.choice(list(word_to_sentences_mapping[random_template_word]))
+                    has_dot = True if "." in sentence2 else False
+                    sentence2_update = sentence2.strip(".").split()
+                    for i in range(len(sentence2_update)):
+                        if sentence2_update[i] == random_template_word:
+                            sentence2_update[i] = entail_candidate
+                    if has_dot:
+                        sentence2_update[-1] += "."
+                    sentence2 = " ".join(sentence2_update)
+                    sentence1 = sentence2.strip(".").split()
+                    for i in range(len(sentence1)):
+                        if sentence1[i] == entail_candidate:
+                            residual_vocab = list(set(all_vocab) - set([entail_candidate]))
+                            random_base = random.choice(residual_vocab)
+                            sentence1[i] = random_base
+                    if has_dot:
+                        sentence1[-1] += "."
+                    sentence1 = " ".join(sentence1)
+                    example2 = {}
+                    example2['sentence1'] = sentence1
+                    example2['sentence2'] = sentence2
+                    base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                    source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                    base_label = self.ENTAIL_LABEL if example['gold_label'] == 'entailment' else self.NEUTRAL_LABEL
+                    intervention = get_intervention()
+                    IIT_label = self.ENTAIL_LABEL
+#                     print(example, example2, IIT_label)
+#                     print("===")
+                    if IIT_label == base_label:
+                        label_unflipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+                    else:
+                        label_flipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+                elif not entail and example['sentence1_lex'] in word_to_neutral_mapping:
+                    entail_candidates = word_to_neutral_mapping[example['sentence1_lex']]
+                    entail_candidate = random.choice(entail_candidates)
+                    # make it super hard, an random template?
+                    random_template_word = random.choice(all_vocab)
+                    sentence2 = random.choice(list(word_to_sentences_mapping[random_template_word]))
+                    has_dot = True if "." in sentence2 else False
+                    sentence2_update = sentence2.strip(".").split()
+                    for i in range(len(sentence2_update)):
+                        if sentence2_update[i] == random_template_word:
+                            sentence2_update[i] = entail_candidate
+                    if has_dot:
+                        sentence2_update[-1] += "."
+                    sentence2 = " ".join(sentence2_update)
+                    sentence1 = sentence2.strip(".").split()
+                    for i in range(len(sentence1)):
+                        if sentence1[i] == entail_candidate:
+                            residual_vocab = list(set(all_vocab) - set([entail_candidate]))
+                            random_base = random.choice(residual_vocab)
+                            sentence1[i] = random_base
+                    if has_dot:
+                        sentence1[-1] += "."
+                    sentence1 = " ".join(sentence1)
+                    example2 = {}
+                    example2['sentence1'] = sentence1
+                    example2['sentence2'] = sentence2
+                    base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                    source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                    base_label = self.ENTAIL_LABEL if example['gold_label'] == 'entailment' else self.NEUTRAL_LABEL
+                    intervention = get_intervention()
+                    IIT_label = self.NEUTRAL_LABEL
+#                     print(example, example2, IIT_label)
+#                     print("===")
+                    if IIT_label == base_label:
+                        label_unflipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+                    else:
+                        label_flipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+            else:
+                example = random.choice(word_neg)
+                entail = random.choice([True, False])
+                if entail and example['sentence1_lex'] in word_to_entail_mapping:
+                    entail_candidates = word_to_entail_mapping[example['sentence1_lex']]
+                    entail_candidate = random.choice(entail_candidates)
+                    # make it super hard, an random template?
+                    random_template_word = random.choice(all_vocab)
+                    sentence2 = random.choice(list(word_to_sentences_mapping[random_template_word]))
+                    has_dot = True if "." in sentence2 else False
+                    sentence2_update = sentence2.strip(".").split()
+                    for i in range(len(sentence2_update)):
+                        if sentence2_update[i] == random_template_word:
+                            sentence2_update[i] = entail_candidate
+                    if has_dot:
+                        sentence2_update[-1] += "."
+                    sentence2 = " ".join(sentence2_update)
+                    sentence1 = sentence2.strip(".").split()
+                    for i in range(len(sentence1)):
+                        if sentence1[i] == entail_candidate:
+                            residual_vocab = list(set(all_vocab) - set([entail_candidate]))
+                            random_base = random.choice(residual_vocab)
+                            sentence1[i] = random_base
+                    if has_dot:
+                        sentence1[-1] += "."
+                    sentence1 = " ".join(sentence1)
+                    example2 = {}
+                    example2['sentence1'] = sentence1
+                    example2['sentence2'] = sentence2
+                    base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                    source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                    base_label = self.ENTAIL_LABEL if example['gold_label'] == 'entailment' else self.NEUTRAL_LABEL
+                    intervention = get_intervention()
+                    IIT_label = self.NEUTRAL_LABEL
+#                     print(example, example2, IIT_label)
+#                     print("===")
+                    if IIT_label == base_label:
+                        label_unflipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+                    else:
+                        label_flipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+                elif not entail and example['sentence1_lex'] in word_to_neutral_mapping:
+                    entail_candidates = word_to_neutral_mapping[example['sentence1_lex']]
+                    entail_candidate = random.choice(entail_candidates)
+                    # make it super hard, an random template?
+                    random_template_word = random.choice(all_vocab)
+                    sentence2 = random.choice(list(word_to_sentences_mapping[random_template_word]))
+                    has_dot = True if "." in sentence2 else False
+                    sentence2_update = sentence2.strip(".").split()
+                    for i in range(len(sentence2_update)):
+                        if sentence2_update[i] == random_template_word:
+                            sentence2_update[i] = entail_candidate
+                    if has_dot:
+                        sentence2_update[-1] += "."
+                    sentence2 = " ".join(sentence2_update)
+                    sentence1 = sentence2.strip(".").split()
+                    for i in range(len(sentence1)):
+                        if sentence1[i] == entail_candidate:
+                            residual_vocab = list(set(all_vocab) - set([entail_candidate]))
+                            random_base = random.choice(residual_vocab)
+                            sentence1[i] = random_base
+                    if has_dot:
+                        sentence1[-1] += "."
+                    sentence1 = " ".join(sentence1)
+                    example2 = {}
+                    example2['sentence1'] = sentence1
+                    example2['sentence2'] = sentence2
+                    base, base_mask = self.embed_func([example["sentence1"], example["sentence2"]])
+                    source, source_mask = self.embed_func([example2["sentence1"], example2["sentence2"]])
+                    base_label = self.ENTAIL_LABEL if example['gold_label'] == 'entailment' else self.NEUTRAL_LABEL
+                    intervention = get_intervention()
+                    IIT_label = self.ENTAIL_LABEL
+#                     print(example, example2, IIT_label)
+#                     print("===")
+                    if IIT_label == base_label:
+                        label_unflipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+                    else:
+                        label_flipped_data.append((base, base_mask, base_label, source, source_mask, IIT_label, intervention))
+
+        random.shuffle(label_flipped_data)
+        random.shuffle(label_unflipped_data)
+        data = label_flipped_data[:self.size//2] + label_unflipped_data[:self.size//2]
+        random.shuffle(data)
+        
+        base, base_mask, y, source, source_mask, IIT_y, interventions = zip(*data)
+        self.base = base
+        self.base_mask = base_mask
+        self.source = source
+        self.source_mask = source_mask
+        self.y = np.array(y)
+        self.IIT_y = np.array(IIT_y)
+        self.interventions = np.array(interventions)
+        return (self.base, self.base_mask), self.y, [(self.source,self.source_mask)], self.IIT_y, self.interventions   
+                        
+    
     def create_neghyp_V1_V2(
         self,
         pmonli_entail=[],

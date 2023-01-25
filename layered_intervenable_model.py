@@ -13,11 +13,14 @@ class InverseLinearLayer(torch.nn.Module):
 
 class LinearLayer(torch.nn.Module):
     """A linear transformation with orthogonal initialization."""
-    def __init__(self, n, device):
+    def __init__(self, n, device, static_search):
         super().__init__()
         self.weight = torch.nn.Parameter(
             torch.empty(n,n).to(device), requires_grad=True)
-        torch.nn.init.orthogonal_(self.weight)
+        if static_search:
+            self.weight.data = torch.eye(self.weight.data.shape[0])
+        else:
+            torch.nn.init.orthogonal_(self.weight)
 
     def set_device(self, device):
         self.weight.to(device)
@@ -73,7 +76,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.target_dims = target_dims
         self.target_layers = target_layers
 
-    def build_graph(self, model_layers, model_layer_dim):
+    def build_graph(self, model_layers, model_layer_dim, static_search, nested_disentangle_inplace):
         self.analysis_model = torch.nn.ModuleList()
         self.normal_model = torch.nn.ModuleList()
         self.labeled_layers = []
@@ -84,12 +87,28 @@ class LayeredIntervenableModel(torch.nn.Module):
             self.analysis_model.extend([model_layer])
             
             if not self.debug and (self.target_layers is None or index in self.target_layers):
-                lin_layer = LinearLayer(model_layer_dim,
-                                        self.device)
-                lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
-                inverse_lin_layer = InverseLinearLayer(lin_layer)
-                self.analysis_model.extend([lin_layer, inverse_lin_layer])
-                self.labeled_layers.append({"disentangle":lin_layer, "reentangle":inverse_lin_layer, "model":model_layer})
+                if nested_disentangle_inplace:
+                    lin_layer = LinearLayer(model_layer_dim,
+                                            self.device, static_search)
+                    lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
+                    
+                    nested_lin_layer = LinearLayer(model_layer_dim,
+                                            self.device, static_search)
+                    nested_lin_layer = torch.nn.utils.parametrizations.orthogonal(nested_lin_layer)
+                    
+                    nested_inverse_lin_layer = InverseLinearLayer(nested_lin_layer)
+                    inverse_lin_layer = InverseLinearLayer(lin_layer)
+                    self.analysis_model.extend([lin_layer, nested_lin_layer, nested_inverse_lin_layer, inverse_lin_layer])
+                    self.labeled_layers.append({"disentangle":lin_layer, "reentangle":inverse_lin_layer, "model":model_layer})
+                    self.labeled_layers.append({"disentangle":nested_lin_layer, "reentangle":nested_inverse_lin_layer, "model":model_layer})
+                else:
+                    lin_layer = LinearLayer(model_layer_dim,
+                                            self.device, static_search)
+                    lin_layer = torch.nn.utils.parametrizations.orthogonal(lin_layer)
+                    inverse_lin_layer = InverseLinearLayer(lin_layer)
+                    self.analysis_model.extend([lin_layer, inverse_lin_layer])
+                    self.labeled_layers.append({"disentangle":lin_layer, "reentangle":inverse_lin_layer, "model":model_layer})
+                
             else:
                 self.labeled_layers.append({"model":model_layer})
 

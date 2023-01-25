@@ -12,8 +12,6 @@ import sys
 import os
 import torch
 
-__author__ = "Christopher Potts"
-__version__ = "CS224u, Stanford, Spring 2022"
 
 
 START_SYMBOL = "<s>"

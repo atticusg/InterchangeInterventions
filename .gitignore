@@ -1,3 +1,5 @@
+*.csv
+saved_models_equality/
 huggingface_cache/
 saved_models_nli/
 archived_results/

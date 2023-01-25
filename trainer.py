@@ -6,8 +6,6 @@ import torch
 import torch.nn as nn
 import utils
 
-__author__ = "Christopher Potts"
-__version__ = "CS224u, Stanford, Spring 2022"
 
 class LIMTrainer:
     def __init__(self,

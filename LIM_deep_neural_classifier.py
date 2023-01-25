@@ -5,8 +5,6 @@ import torch.utils.data
 from layered_intervenable_model import LayeredIntervenableModel
 import utils
 
-__author__ = "Atticus Geiger"
-__version__ = "CS224u, Stanford, Spring 2022"
 
 
 class ActivationLayer(torch.nn.Module):

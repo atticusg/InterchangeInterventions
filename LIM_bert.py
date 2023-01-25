@@ -9,6 +9,57 @@ class SequentialLayers(torch.nn.Module):
         self.layers = layers
         self.target_dims = target_dims
 
+#     def forward(self,
+#                 hidden_states,
+#                 layer_num=0,
+#                 attention_mask=None,
+#                 head_mask=None,
+#                 encoder_hidden_states=None,
+#                 encoder_attention_mask=None,
+#                 past_key_values=None,
+#                 use_cache=None,
+#                 output_attentions=False,
+#                 output_hidden_states=False,
+#                 return_dict=True):
+
+#         args = (hidden_states,
+#                 layer_num,
+#                 attention_mask,
+#                 head_mask,
+#                 encoder_hidden_states,
+#                 encoder_attention_mask,
+#                 past_key_values,
+#                 use_cache,
+#                 output_attentions,
+#                 output_hidden_states,
+#                 return_dict)
+#         args = self.layers[0](*args)
+#         count = 0
+
+#         prefix = None
+#         suffix = None
+        
+#         first_linear = True
+#         first_inverse = True
+#         for layer in self.layers[1:]:
+#             if isinstance(layer, LinearLayer):
+#                 output = args[0]
+#                 original_shape = copy.deepcopy(output.shape)
+#                 output = torch.reshape(output, (original_shape[0], -1))
+#                 rest = args[1:]
+#                 if self.target_dims is None:
+#                     args = layer(output)
+#                 else:
+#                     target = output[:,self.target_dims["start"]:self.target_dims["end"]]
+#                     prefix = output[:,:self.target_dims["start"]]
+#                     suffix = output[:,self.target_dims["end"]:]
+#                     args = layer(target)
+#             elif isinstance(layer, InverseLinearLayer):
+#                 args = (torch.cat([prefix, layer(args), suffix], 1).reshape(original_shape), *rest)
+#             else:
+#                 args = layer(*args)
+#         return args
+    
     def forward(self,
                 hidden_states,
                 layer_num=0,
@@ -38,21 +89,32 @@ class SequentialLayers(torch.nn.Module):
 
         prefix = None
         suffix = None
+        
+        first_linear = True
+        first_inverse = True
         for layer in self.layers[1:]:
             if isinstance(layer, LinearLayer):
-                output = args[0]
-                original_shape = copy.deepcopy(output.shape)
-                output = torch.reshape(output, (original_shape[0], -1))
-                rest = args[1:]
-                if self.target_dims is None:
-                    args = layer(output)
+                if first_linear:
+                    output = args[0]
+                    original_shape = copy.deepcopy(output.shape)
+                    output = torch.reshape(output, (original_shape[0], -1))
+                    rest = args[1:]
+                    if self.target_dims is None:
+                        args = layer(output)
+                    else:
+                        target = output[:,self.target_dims["start"]:self.target_dims["end"]]
+                        prefix = output[:,:self.target_dims["start"]]
+                        suffix = output[:,self.target_dims["end"]:]
+                        args = layer(target)
+                    first_linear = False
                 else:
-                    target = output[:,self.target_dims["start"]:self.target_dims["end"]]
-                    prefix = output[:,:self.target_dims["start"]]
-                    suffix = output[:,self.target_dims["end"]:]
                     args = layer(target)
             elif isinstance(layer, InverseLinearLayer):
-                args = (torch.cat([prefix, layer(args), suffix], 1).reshape(original_shape), *rest)
+                if first_inverse:
+                    args = layer(args)
+                    first_inverse = False
+                else:
+                    args = (torch.cat([prefix, layer(args), suffix], 1).reshape(original_shape), *rest)
             else:
                 args = layer(*args)
         return args
@@ -152,6 +214,8 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 debug=False,
                 target_dims=None,
                 target_layers=None,
+                static_search=False,
+                nested_disentangle_inplace=False
                 ):
         super().__init__(
             debug=debug,
@@ -177,7 +241,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         self.classifier_layer = torch.nn.Linear(self.hidden_dim, self.n_classes)
         self.pooler = bert.pooler
         
-        self.build_graph(self.model_layers, self.model_dim)
+        self.build_graph(self.model_layers, self.model_dim, static_search, nested_disentangle_inplace)
 
     def freeze_model_parameters(self):
         """Freezes the model weights (for analysis purposes)"""
