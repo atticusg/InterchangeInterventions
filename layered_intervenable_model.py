@@ -302,7 +302,8 @@ class LayeredIntervenableModel(torch.nn.Module):
         Returns the values at the coordinate in `get` for model input `input`
         when the interventions in `sets` are performed.
         """
-        input = input.type(torch.FloatTensor).to(self.device)
+        # NOTE: assuming that input is already on correct device
+        # input = input.type(torch.FloatTensor).to(self.device)
         if sets is not None:
             for i in range(len(sets)):
                 sets[i]["intervention"] = sets[i]["intervention"].to(self.device)
@@ -313,4 +314,6 @@ class LayeredIntervenableModel(torch.nn.Module):
         logits = self.forward(input)
         for handler in handlers:
             handler.remove()
-        return self.activation[f'{get["layer"]}-{get["start"]}-{get["end"]}']
+        
+        # NOTE: returning logits along with activation, for easier intervention experiments
+        return self.activation[f'{get["layer"]}-{get["start"]}-{get["end"]}'], logits

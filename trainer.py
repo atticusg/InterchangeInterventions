@@ -153,7 +153,14 @@ class LIMTrainer:
         self.n_iter_no_change = n_iter_no_change
         self.tol = tol
         self.first_run = True
-        self.loss = nn.CrossEntropyLoss(reduction="mean")
+
+        # NOTE: INTRODUCE MSE LOSS FOR REGRESSION
+        self.n_classes = self.model.n_classes
+        if self.n_classes and self.n_classes == 1:
+            self.loss = nn.MSELoss(reduction='mean')
+        else:
+            self.loss = nn.CrossEntropyLoss(reduction="mean")
+        
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
@@ -373,7 +380,12 @@ class LIMTrainer:
                 base_batch, base_labels_batch  = self.process_batch(batch)
                 batch_preds = self.model(base_batch)
                 base_labels_batch = torch.squeeze(base_labels_batch)
-                err = self.loss(batch_preds, base_labels_batch)
+
+                # NOTE: Converting int to long for CE, adding MSE loss case
+                if self.n_classes == 1:
+                    err = self.loss(batch_preds.squeeze(), base_labels_batch.to(torch.float).squeeze())
+                else:
+                    err = self.loss(batch_preds, base_labels_batch.to(torch.long))
                 if iit_data is not None:
                     sources_batch, iit_labels_batch, intervention_ids_batch \
                         = self.process_IIT_batch(batch)
@@ -382,7 +394,11 @@ class LIMTrainer:
                                     sources_batch,
                                     intervention_ids_batch,
                                     intervention_ids_to_coords)
-                    err += self.loss(batch_iit_preds, iit_labels_batch)
+                    # NOTE: Converting int to long for CE, adding MSE loss case
+                    if self.n_classes == 1:
+                        err += self.loss(batch_iit_preds.squeeze(), iit_labels_batch.to(torch.float).squeeze())
+                    else:
+                        err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
                 if self.gradient_accumulation_steps > 1 and \
                   self.loss.reduction == "mean":
                     err /= self.gradient_accumulation_steps
@@ -403,9 +419,11 @@ class LIMTrainer:
                 PATH = f"{save_checkpoint_prefix}-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
                 torch.save(self.model.state_dict(), PATH)
             # Saving checkpoints:
-            if iteration % 50 == 0:
+            # if iteration % 50 == 0:
+            if iteration % 5 == 0:
                 if self.save_checkpoint_per_epoch:
-                    PATH = f"./saved_models_arithmetic/basemodel-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
+                    # PATH = f"./saved_models_arithmetic/basemodel-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
+                    PATH = f'./saved_models/blackbox-{iteration}-{self.seed}.bin'
                     torch.save(self.model.state_dict(), PATH)
             
             # Stopping criteria:
@@ -603,6 +621,11 @@ class LIMTrainer:
 
         # Make sure the model is back on the instance device:
         self.model.to(self.device)
+
+        # NOTE: Adding result for regression
+        # (no need to take argmax)
+        if self.n_classes == 1:
+            return preds.squeeze()
         
         if self.class2index is not None:
             preds = preds.argmax(axis=1)
@@ -694,6 +717,11 @@ class LIMTrainer:
         # Make sure the model is back on the instance device:
         self.model.set_device(self.device)
         self.model.device = old_device
+
+        # NOTE: Adding result for regression
+        # (no need to take argmax)
+        if self.n_classes == 1:
+            return preds.squeeze()
 
         if self.class2index is not None:
             preds = preds.argmax(axis=1)
@@ -892,9 +920,81 @@ class BERTLIMTrainer(LIMTrainer):
                     preds = torch.cat([preds, batch_preds])
         # Make sure the model is back on the instance device:
         self.model.set_device(self.device)
+
+        # NOTE: Adding result for regression
+        # (no need to take argmax)
+        if self.n_classes == 1:
+            return preds.squeeze()
+
         return preds.argmax(axis=1)
+    
+    def predict_with_intervention(self, X_base, gets, intervention, variable=0, device=None):
+        """
+        Internal method that subclasses are expected to use to define
+        their own `predict` functions. The hope is that this method
+        can do all the data organization and other details, allowing
+        subclasses to have compact predict methods that just encode
+        the core logic specific to them.
+        Parameters
+        ----------
+        *args: system inputs
+        device: str or None
+            Allows the user to temporarily change the device used
+            during prediction. This is useful if predictions require a
+            lot of memory and so are better done on the CPU. After
+            prediction is done, the model is returned to `self.device`.
+        Returns
+        -------
+        The precise return value depends on the nature of the predictions.
+        If the predictions have the same shape across all batches, then
+        we return a single tensor concatenation of them. If the shape
+        can vary across batches, as is common for sequence prediction,
+        then we return a list of tensors of varying length.
+        """
+        device = self.device if device is None else torch.device(device)
+        y_base = torch.tensor([0 for _ in range(len(X_base[0]))])
+        dataset = self.build_dataset(X_base, y_base)
+        dataloader = self._build_dataloader(dataset, shuffle=False)
+        # Dataset:
 
+        # Model:
+        self.model.set_device(device)
+        self.model.eval()
+        preds = None
 
+        sets = copy.deepcopy(gets)
+        sets[variable]['intervention'] = intervention.repeat((self.batch_size, 1))
+
+        with torch.no_grad():
+            for batch_num, batch in enumerate(dataloader, start=1):
+                batch = [x.to(device, non_blocking=True) for x in batch]
+                base_batch, base_labels_batch = self.process_batch(batch, device=device)
+
+                # account for last batch, which might have smaller size
+                if base_batch[0].size(0) < self.batch_size:
+                    sets[0]['intervention'] = intervention.repeat((base_batch[0].size(0), 1))
+
+                # apply intervention
+                handlers = self.model._gets_sets(gets=None, sets=sets)
+                batch_preds = self.model.forward(
+                                base_batch)
+                # clean up intervention hooks
+                for handler in handlers:
+                    handler.remove()
+
+                if preds is None:
+                    preds = batch_preds
+                else:
+                    preds = torch.cat([preds, batch_preds])
+        # Make sure the model is back on the instance device:
+        self.model.set_device(self.device)
+
+        # NOTE: Adding result for regression
+        # (no need to take argmax)
+        if self.n_classes == 1:
+            return preds.squeeze()
+
+        return preds.argmax(axis=1)
 
     def process_IIT_batch(self,batch):
         # cast tensors to trainer device
@@ -903,8 +1003,6 @@ class BERTLIMTrainer(LIMTrainer):
             batch[5].to(self.device),
             batch[6].to(self.device)
         )
-
-
 
     def iit_predict(
         self,
@@ -973,4 +1071,10 @@ class BERTLIMTrainer(LIMTrainer):
         self.device = old_device
         self.model.set_device(self.device)
         self.model.device = old_device
+
+        # NOTE: Adding result for regression
+        # (no need to take argmax)
+        if self.n_classes == 1:
+            return preds.squeeze()
+
         return preds.argmax(axis=1)
