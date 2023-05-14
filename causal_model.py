@@ -6,7 +6,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 class CausalModel:
-    def __init__(self, variables, values, parents, functions, timesteps = None):
+    def __init__(self, variables, values, parents, functions, timesteps = None, pos = None):
         self.variables = variables
         self.values= values
         self.parents = parents
@@ -51,6 +51,15 @@ class CausalModel:
                 self.timesteps[output] = self.end_time
         self.variables.sort(key=lambda x: self.timesteps[x])
         self.run_forward()
+        self.pos = pos
+        width = {_:0 for _ in range(len(self.variables))}
+        if self.pos == None:
+            self.pos = dict()
+        for var in self.variables:
+            if var not in pos:
+                pos[var] = (width[self.timesteps[var]], self.timesteps[var])
+                width[self.timesteps[var]] += 1
+
 
     def generate_timesteps(self):
         timesteps = {input:0 for input in self.inputs}
@@ -79,32 +88,41 @@ class CausalModel:
         G = nx.DiGraph()
         G.add_edges_from([(parent,child) for child in self.variables for parent in self.parents[child]])
         plt.figure(figsize=(10,10))
-        width = {_:0 for _ in range(len(self.variables))}
-        if pos == None:
-            pos = dict()
-        for var in self.variables:
-            if var not in pos:
-                pos[var] = (width[self.timesteps[var]], self.timesteps[var])
-                width[self.timesteps[var]] += 1
-        edges = nx.draw_networkx(G, with_labels = True, node_color ='green', pos = pos)
+        edges = nx.draw_networkx(G, with_labels = True, node_color ='green', pos = self.pos)
         plt.show()
 
-    def print_setting(self,total_setting,pos=None):
+    def find_live_paths(self, intervention):
+        actual_setting = self.run_forward(intervention)
+        paths = [[variable] for variable in self.variables]
+        while True:
+            new_paths = []
+            for path in paths:
+                for child in self.children[path[-1]]:
+                    actual_cause = False
+                    for value in self.values[path[-1]]:
+                        newintervention = copy.deepcopy(intervention)
+                        newintervention[path[-1]] = value
+                        counterfactual_setting = self.run_forward(newintervention)
+                        if counterfactual_setting[child] != actual_setting[child]:
+                            actual_cause = True
+                    if actual_cause:
+                        new_paths.append(copy.deepcopy(path)+[child])
+            paths = new_paths
+            if len(paths) == len(new_paths):
+                break
+        return [path for path in paths if len(path)>1]
+
+
+    def print_setting(self,total_setting):
         relabeler = {var: var + ": " + str(total_setting[var]) for var in self.variables}
         G = nx.DiGraph()
         G.add_edges_from([(parent,child) for child in self.variables for parent in self.parents[child]])
         plt.figure(figsize=(10,10))
-        width = {_:0 for _ in range(len(self.variables))}
-        if pos == None:
-            pos = dict()
-        for var in self.variables:
-            if var not in pos:
-                pos[var] = (width[self.timesteps[var]], self.timesteps[var])
-                width[self.timesteps[var]] += 1
         G = nx.relabel_nodes(G, relabeler)
         newpos = dict()
-        for var in pos:
-            newpos[relabeler[var]] = pos[var]
+        if self.pos is not None:
+            for var in self.pos:
+                newpos[relabeler[var]] = self.pos[var]
         edges = nx.draw_networkx(G, with_labels = True, node_color ='green', pos = newpos)
         plt.show()
 

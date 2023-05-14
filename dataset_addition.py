@@ -1,5 +1,8 @@
 from causal_model import CausalModel
 
+# A path is live if each variable on the path is an actual cause of the variables
+# later on the path.
+
 def listToInput(l):
     return {"X1":l[0], "X2":l[1], "X3":l[2], "X4":l[3], "X5":l[4],
                 "Y1":l[5], "Y2":l[6], "Y3":l[7], "Y4":l[8], "Y5":l[9]}
@@ -55,9 +58,6 @@ def highlevel_addition_model():
         functions["O"+str(i)] = OOther
 
     functions["O6"] = O6
-    return CausalModel(variables, values, parents, functions)
-
-def print_pos():
     pos = dict()
     for i in range(1,6):
         pos["X"+str(i)] = (6-i,0)
@@ -68,18 +68,9 @@ def print_pos():
     pos["C2"] = (6-2,4)
     pos["C3"] = (6-3,5)
     pos["C4"] = (6-4,6)
-    return pos
+    return CausalModel(variables, values, parents, functions,pos=pos)
 
 
-
-def test_highlevel():
-    model = highlevel_addition_model()
-    pos = print_pos()
-    model.print_structure(pos=pos)
-    print(model.run_forward())
-    input = model.sample_input(mandatory={"C1":1, "C4":1, "O6":1})
-    print(model.run_forward(intervention=input))
-    model.print_setting(model.run_forward(intervention=input), pos = pos)
 
 def highlevel_nocarry_model():
     variables = ["X5", "X4", "X3", "X2", "X1",
@@ -96,32 +87,34 @@ def highlevel_nocarry_model():
     def FILLER():
         return 0
 
-    def C1(x1,y1):
-        return int(x1 + y1 > 9)
+    def OOther(x,y):
+        return (x + y) % 10
 
-    def COther(x,y,c):
-        return int(x + y + c > 9)
-
-    def O1(x1,y1):
-        return (x1 + y1) % 10
-
-    def OOther(x,y,c):
-        return (x + y + c) % 10
-
-    def O6(x5,y5,c4):
-        return int(x5+y5+c4> 9)
+    def O6(x5,y5):
+        return int(x5+y5> 9)
 
     functions = { _ : FILLER for _ in variables[:10]}
-
-    functions["C1"] = C1
-    for i in range(2, 5):
-        functions["C"+str(i)] = COther
-
-    functions["O1"] = O1
-    for i in range(2, 6):
+    for i in range(1, 6):
         functions["O"+str(i)] = OOther
-
     functions["O6"] = O6
-    return CausalModel(variables, values, parents, functions)
+    pos = dict()
+    for i in range(1,6):
+        pos["X"+str(i)] = (6-i,0)
+        pos["Y"+str(i)] = (5.5-i,1)
+        pos["O"+str(i)] = (6-i,7)
+    pos["O"+str(6)] = (6-6,7)
+    return CausalModel(variables, values, parents, functions, pos=pos)
 
-test_highlevel()
+def test_model(model):
+    model.print_structure()
+    print(model.run_forward())
+    input = model.sample_input()
+    print(model.run_forward(intervention=input))
+    model.print_setting(model.run_forward(intervention=input))
+    print(model.find_live_paths(input))
+
+model = highlevel_addition_model()
+test_model(model)
+
+model = highlevel_nocarry_model()
+test_model(model)
