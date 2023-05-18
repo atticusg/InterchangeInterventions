@@ -93,10 +93,11 @@ class CausalModel:
 
     def find_live_paths(self, intervention):
         actual_setting = self.run_forward(intervention)
-        paths = [[variable] for variable in self.variables]
+        paths = {1:[[variable] for variable in self.variables]}
+        step = 2
         while True:
-            new_paths = []
-            for path in paths:
+            paths[step] = []
+            for path in paths[step-1]:
                 for child in self.children[path[-1]]:
                     actual_cause = False
                     for value in self.values[path[-1]]:
@@ -106,11 +107,12 @@ class CausalModel:
                         if counterfactual_setting[child] != actual_setting[child]:
                             actual_cause = True
                     if actual_cause:
-                        new_paths.append(copy.deepcopy(path)+[child])
-            paths = new_paths
-            if len(paths) == len(new_paths):
+                        paths[step].append(copy.deepcopy(path)+[child])
+            if len(paths[step]) == 0:
                 break
-        return [path for path in paths if len(path)>1]
+            step += 1
+        del paths[1]
+        return paths
 
 
     def print_setting(self,total_setting):
@@ -159,12 +161,7 @@ class CausalModel:
     def sample_input(self, mandatory=None):
         input = {var: random.sample(self.values[var],1)[0] for var in self.inputs}
         total = self.run_forward(intervention=input)
-        def agree(t, m):
-            for var in m:
-                if m[var] != t[var]:
-                    return False
-            return True
-        while mandatory is not None and not agree(total, mandatory):
+        while mandatory is not None and not mandatory(total):
             input = {var: random.sample(self.values[var],1)[0] for var in self.inputs}
             total = self.run_forward(intervention=input)
         return input

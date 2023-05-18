@@ -28,6 +28,7 @@ class LIMTrainer:
             device=None,
             display_progress=True,
             blackout_classes=None,
+            loss=None,
             **optimizer_kwargs):
         """
         Base class for all the PyTorch-based models.
@@ -153,7 +154,11 @@ class LIMTrainer:
         self.tol = tol
         self.first_run = True
         self.blackout_classes = blackout_classes
-        self.loss = nn.CrossEntropyLoss(reduction="mean")
+        if loss is None:
+            self.loss = nn.CrossEntropyLoss(reduction="mean")
+        else:
+            CE = nn.CrossEntropyLoss(reduction="mean")
+            self.loss = loss(CE)
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
@@ -205,7 +210,8 @@ class LIMTrainer:
         return dataset
 
     def build_dataset(self, base_x, base_y):
-        base_x = torch.FloatTensor(np.array(base_x))
+        if not torch.is_tensor(base_x):
+            base_x = torch.FloatTensor(np.array(base_x))
 
         if not torch.is_tensor(base_y):
             base_y = np.array(base_y)
