@@ -1,10 +1,23 @@
 import copy
+from typing import Optional
 import numpy as np
 import pickle
 from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
 import utils
+
+from tqdm import tqdm
+
+def contrastive_loss(logits: torch.Tensor, labels: Optional[torch.Tensor] = None) -> torch.Tensor:
+    if labels is not None:
+        return nn.functional.cross_entropy(logits, labels)
+    return nn.functional.cross_entropy(logits, torch.arange(len(logits), device=logits.device))
+
+def clip_iit_loss(similarity: torch.Tensor, labels: Optional[torch.Tensor] = None) -> torch.Tensor:
+    # loss computes whether intervention affects final output
+    iit_loss = contrastive_loss(similarity, labels)
+    return iit_loss
 
 
 class LIMTrainer:
@@ -154,9 +167,11 @@ class LIMTrainer:
         self.tol = tol
         self.first_run = True
 
-        # NOTE: INTRODUCE MSE LOSS FOR REGRESSION
+        # NOTE: INTRODUCE MSE LOSS FOR REGRESSION, CLIP LOSS FOR CONTRASTIVE LEARNING
         self.n_classes = self.model.n_classes
-        if self.n_classes and self.n_classes == 1:
+        if self.n_classes is None:
+            self.loss = nn.CrossEntropyLoss()
+        elif self.n_classes and self.n_classes == 1:
             self.loss = nn.MSELoss(reduction='mean')
         else:
             self.loss = nn.CrossEntropyLoss(reduction="mean")
@@ -375,45 +390,82 @@ class LIMTrainer:
 
             epoch_error = 0.0
 
-            for batch_num, batch in enumerate(dataloader, start=1):
-                batch = [x.to(self.device) for x in batch]
-                base_batch, base_labels_batch  = self.process_batch(batch)
-                batch_preds = self.model(base_batch)
-                base_labels_batch = torch.squeeze(base_labels_batch)
+            with tqdm(dataloader, desc=f'Epoch {iteration}') as pbar:
+                for batch_num, batch in enumerate(pbar, start=1):
+                    batch = [x.to(self.device) for x in batch]
+                    base_batch, base_labels_batch  = self.process_batch(batch)
 
-                # NOTE: Converting int to long for CE, adding MSE loss case
-                if self.n_classes == 1:
-                    err = self.loss(batch_preds.squeeze(), base_labels_batch.to(torch.float).squeeze())
-                else:
-                    err = self.loss(batch_preds, base_labels_batch.to(torch.long))
-                if iit_data is not None:
-                    sources_batch, iit_labels_batch, intervention_ids_batch \
-                        = self.process_IIT_batch(batch)
-                    batch_iit_preds = self.model.iit_forward(
-                                    base_batch,
-                                    sources_batch,
-                                    intervention_ids_batch,
-                                    intervention_ids_to_coords)
-                    # NOTE: Converting int to long for CE, adding MSE loss case
-                    if self.n_classes == 1:
-                        err += self.loss(batch_iit_preds.squeeze(), iit_labels_batch.to(torch.float).squeeze())
+                    # NOTE: AMIR ADDITION - LEARN INTERVENTION BY CALLING ON FORWARD WITH INTERVENTION
+                    if self.model.learn_intervention_vector:
+                        batch_preds = self.model.forward_with_intervention(
+                            base_batch, intervention_ids_to_coords
+                        )
                     else:
-                        err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
-                if self.gradient_accumulation_steps > 1 and \
-                  self.loss.reduction == "mean":
-                    err /= self.gradient_accumulation_steps
+                        batch_preds = self.model(base_batch)
 
-                err.backward()
+                    base_labels_batch = torch.squeeze(base_labels_batch)
 
-                epoch_error += err.item()
+                    # NOTE: Converting int to long for CE, adding MSE loss case
+                    # if learning intervention vector, do not rely on labels during training
+                    if self.model.learn_intervention_vector:
+                        pass
+                    elif self.n_classes is None:
+                        # evaluate non-IIT loss by comparing descriptions and captions
+                        # base labels can be read by the index of the first logit (specifically for our implementation of CLIP)
+                        if iit_data is None:
+                            base_labels_batch = base_labels_batch.view(-1, 2)[:, 0]
+                            base_preds = batch_preds.diag().view(base_labels_batch.size(0), 2)
+                            err = self.loss(base_preds, base_labels_batch.to(torch.long))
 
-                if batch_num % self.gradient_accumulation_steps == 0 or \
-                  batch_num == len(dataloader):
-                    if self.max_grad_norm is not None:
-                        torch.nn.utils.clip_grad_norm_(
-                            self.model.parameters(), self.max_grad_norm)
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                    elif self.n_classes == 1:
+                        err = self.loss(batch_preds.squeeze(), base_labels_batch.to(torch.float).squeeze())
+                    else:
+                        err = self.loss(batch_preds, base_labels_batch.to(torch.long))
+
+                    if iit_data is not None:
+                        sources_batch, iit_labels_batch, intervention_ids_batch \
+                            = self.process_IIT_batch(batch)
+                        
+                        if self.model.learn_intervention_vector:
+                            batch_iit_preds = self.model.forward_with_intervention(
+                                sources_batch, intervention_ids_to_coords
+                            )
+                        else:
+                            batch_iit_preds = self.model.iit_forward(
+                                base_batch,
+                                sources_batch,
+                                intervention_ids_batch,
+                                intervention_ids_to_coords
+                            )
+                        # NOTE: Converting int to long for CE, adding MSE loss case
+                        if self.n_classes is None:
+                            base_preds = batch_preds.diag()
+                            iit_preds = batch_iit_preds.diag()
+                            preds = torch.stack((base_preds, iit_preds)).t()
+                            err = self.loss(preds, iit_labels_batch.to(torch.long))
+                        elif self.model.learn_intervention_vector:
+                            err = self.loss(batch_preds.squeeze(), batch_iit_preds.squeeze())
+
+                        elif self.n_classes == 1:
+                            err += self.loss(batch_iit_preds.squeeze(), iit_labels_batch.to(torch.float).squeeze())
+                        else:
+                            err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
+                    if self.gradient_accumulation_steps > 1 and \
+                    self.loss.reduction == "mean":
+                        err /= self.gradient_accumulation_steps
+
+                    err.backward()
+
+                    epoch_error += err.item()
+                    pbar.set_postfix({'loss': err.item(), 'epoch_loss': epoch_error})
+
+                    if batch_num % self.gradient_accumulation_steps == 0 or \
+                    batch_num == len(dataloader):
+                        if self.max_grad_norm is not None:
+                            torch.nn.utils.clip_grad_norm_(
+                                self.model.parameters(), self.max_grad_norm)
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
             
             if save_checkpoint_per_epoch_overwrite:
                 PATH = f"{save_checkpoint_prefix}-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
@@ -1078,3 +1130,294 @@ class BERTLIMTrainer(LIMTrainer):
             return preds.squeeze()
 
         return preds.argmax(axis=1)
+
+
+class CLIPLIMTrainer(LIMTrainer):
+    def __init__(self, lim_clip, **kwargs):
+        super().__init__(lim_clip, **kwargs)
+
+    def build_dataset(self, base_x, base_y):
+
+        input, mask, image_embeds = base_x
+        input = torch.stack(input)
+        mask = torch.stack(mask)
+        image_embeds = torch.stack(image_embeds)
+
+        dataset = torch.utils.data.TensorDataset(input, mask, image_embeds, base_y)
+        return dataset
+
+    def build_iit_dataset(self, base, base_y, iit_data):
+
+        base_input, base_mask, base_image_embeds = base
+        base_input = torch.stack(base_input)
+        base_mask = torch.stack(base_mask)
+        base_image_embeds = torch.stack(base_image_embeds)
+
+        sources, IIT_y, intervention_ids = iit_data
+
+        if len(sources) == 1:
+            sources_input, sources_mask, sources_image_embeds = sources[0]
+            sources_input = [sources_input]
+            sources_mask = [sources_mask]
+            sources_image_embeds = [sources_image_embeds]
+        else:
+            sources_input, sources_mask, sources_image_embeds = zip(*sources)
+        sources_input = [ torch.stack(input) for input in sources_input]
+        sources_mask = [ torch.stack(mask) for mask in sources_mask]
+        sources_image_embeds = [ torch.stack(image_embed) for image_embed in sources_image_embeds]
+
+        sources_input = torch.reshape(
+            torch.stack(sources_input, dim=1),
+            (-1, len(sources),
+            base_input.shape[-1]))
+
+        sources_mask = torch.reshape(
+            torch.stack(sources_mask, dim=1),
+            (-1, len(sources),
+            base_input.shape[-1]))
+        
+        sources_image_embeds = torch.reshape(
+            torch.stack(sources_image_embeds, dim=1),
+            (-1, len(sources),
+            base_image_embeds.shape[-1]))
+
+        if isinstance(intervention_ids, list):
+            intervention_ids = torch.FloatTensor(np.array(intervention_ids))
+
+        dataset = torch.utils.data.TensorDataset(base_input,
+                                                base_mask,
+                                                base_image_embeds,
+                                                base_y,
+                                                sources_input,
+                                                sources_mask,
+                                                sources_image_embeds,
+                                                IIT_y,
+                                                intervention_ids)
+        return dataset
+
+    def process_batch(self, batch, device=None):
+        if device == None:
+            device = self.device
+        # cast tensors to trainer device
+        return (
+            (batch[0].squeeze().to(device), batch[1].squeeze().to(device), batch[2].squeeze(0).to(device)),
+            batch[3].to(device)
+        )
+
+    def predict(self, X_base, device=None):
+        """
+        Internal method that subclasses are expected to use to define
+        their own `predict` functions. The hope is that this method
+        can do all the data organization and other details, allowing
+        subclasses to have compact predict methods that just encode
+        the core logic specific to them.
+        Parameters
+        ----------
+        *args: system inputs
+        device: str or None
+            Allows the user to temporarily change the device used
+            during prediction. This is useful if predictions require a
+            lot of memory and so are better done on the CPU. After
+            prediction is done, the model is returned to `self.device`.
+        Returns
+        -------
+        The precise return value depends on the nature of the predictions.
+        If the predictions have the same shape across all batches, then
+        we return a single tensor concatenation of them. If the shape
+        can vary across batches, as is common for sequence prediction,
+        then we return a list of tensors of varying length.
+        """
+        device = self.device if device is None else torch.device(device)
+        y_base = torch.tensor([0 for _ in range(len(X_base[0]))])
+        dataset = self.build_dataset(X_base, y_base)
+        dataloader = self._build_dataloader(dataset, shuffle=False)
+        # Dataset:
+
+        # Model:
+        self.model.set_device(device)
+        self.model.eval()
+        preds = None
+
+        with torch.no_grad():
+            for batch_num, batch in enumerate(tqdm(dataloader), start=1):
+                batch = [x.to(device, non_blocking=True) for x in batch]
+                base_batch, base_labels_batch = self.process_batch(batch, device=device)
+
+                batch_preds = self.model.forward(
+                    base_batch
+                )
+
+                # FOR CLIP ONLY: we are only concerned with diagonal entries (right image to right description)
+                batch_preds = batch_preds.diag()
+
+                if preds is None:
+                    preds = batch_preds
+                else:
+                    preds = torch.cat([preds, batch_preds])
+        # Make sure the model is back on the instance device:
+        self.model.set_device(self.device)
+
+        # NOTE: Adding result for regression
+        # (no need to take argmax)
+        if self.n_classes is None or self.n_classes == 1:
+            return preds.squeeze()
+
+        return preds.argmax(axis=1)
+    
+    def predict_with_intervention(self, X_base, gets, intervention, variable=0, device=None):
+        """
+        Internal method that subclasses are expected to use to define
+        their own `predict` functions. The hope is that this method
+        can do all the data organization and other details, allowing
+        subclasses to have compact predict methods that just encode
+        the core logic specific to them.
+        Parameters
+        ----------
+        *args: system inputs
+        device: str or None
+            Allows the user to temporarily change the device used
+            during prediction. This is useful if predictions require a
+            lot of memory and so are better done on the CPU. After
+            prediction is done, the model is returned to `self.device`.
+        Returns
+        -------
+        The precise return value depends on the nature of the predictions.
+        If the predictions have the same shape across all batches, then
+        we return a single tensor concatenation of them. If the shape
+        can vary across batches, as is common for sequence prediction,
+        then we return a list of tensors of varying length.
+        """
+        device = self.device if device is None else torch.device(device)
+        y_base = torch.tensor([0 for _ in range(len(X_base[0]))])
+        dataset = self.build_dataset(X_base, y_base)
+        dataloader = self._build_dataloader(dataset, shuffle=False)
+        # Dataset:
+
+        # Model:
+        self.model.set_device(device)
+        self.model.eval()
+        preds = None
+
+        sets = copy.deepcopy(gets)
+        sets[variable]['intervention'] = intervention.repeat((self.batch_size, 1))
+
+        with torch.no_grad():
+            for batch_num, batch in enumerate(dataloader, start=1):
+                batch = [x.to(device, non_blocking=True) for x in batch]
+                base_batch, base_labels_batch = self.process_batch(batch, device=device)
+
+                # account for last batch, which might have smaller size
+                if base_batch[0].size(0) < self.batch_size:
+                    sets[0]['intervention'] = intervention.repeat((base_batch[0].size(0), 1))
+
+                # apply intervention
+                handlers = self.model._gets_sets(gets=None, sets=sets)
+                batch_preds = self.model.forward(
+                                base_batch)
+                # clean up intervention hooks
+                for handler in handlers:
+                    handler.remove()
+
+                if preds is None:
+                    preds = batch_preds
+                else:
+                    preds = torch.cat([preds, batch_preds])
+        # Make sure the model is back on the instance device:
+        self.model.set_device(self.device)
+
+        # NOTE: Adding result for regression
+        # (no need to take argmax)
+        if self.n_classes == 1:
+            return preds.squeeze()
+
+        return preds.argmax(axis=1)
+
+    def process_IIT_batch(self, batch):
+        # cast tensors to trainer device
+        return (
+            (batch[4].squeeze().to(self.device), batch[5].squeeze().to(self.device), batch[6].squeeze(0).to(self.device)),
+            batch[7].to(self.device),
+            batch[8].to(self.device)
+        )
+
+    def iit_predict(
+        self,
+        base,
+        sources,
+        intervention_ids,
+        intervention_ids_to_coords,
+        device=None
+    ):
+        """
+        NOTE: rewrote original IIT predict (seemed to have some problems with
+        vector shapes). This one hopefully better matches the format of `iit_predict`
+        written in the more general `LIMTrainer` class.
+        (in fact, should be identical if we ensure that `base` and `sources` are cast
+        to tensors)
+        """
+        device = self.device if device is None else torch.device(device)
+
+        # Dataset:
+        # base = base.float().to(device)
+        # sources = [source.to(device) for source in sources]
+
+        intervention_ids = intervention_ids.float().to(device)
+
+        # base_labels = [ 0 for _ in range(base.shape[0])]
+        # iit_labels = [ 0 for _ in range(base.shape[0])]
+        base_labels = iit_labels = torch.tensor([0] * len(base[0]))
+
+        iit_data = (sources, iit_labels, intervention_ids)
+        dataset = self.build_iit_dataset(base, base_labels, iit_data)
+        dataloader = self._build_dataloader(dataset, shuffle=False)
+
+        # Model:
+        self.model.set_device(device)
+
+        old_device = self.model.device
+        self.model.device = device
+        # Temporary fix: set self.device to be specified device, then set back
+        # (better solution is to add device as an optional parameter to process batch)
+        self.device = device
+
+        self.model.eval()
+
+        preds = None
+        with torch.no_grad():
+            for batch_num, batch in enumerate(tqdm(dataloader), start=1):
+                batch = [x.to(device, non_blocking=True) for x in batch]
+                base_batch, base_labels_batch = self.process_batch(batch)
+
+                # base_batch = batch[0]
+                # base_labels_batch = batch[1]
+                sources_batch, iit_labels_batch, intervention_ids_batch = self.process_IIT_batch(batch)
+                # sources_batch = batch[2]
+                # iit_labels_batch = batch[3]
+                # intervention_ids_batch = batch[4]
+                batch_iit_preds = self.model.iit_forward(
+                    base_batch,
+                    sources_batch,
+                    intervention_ids_batch,
+                    intervention_ids_to_coords
+                )
+                
+                # FOR CLIP ONLY: we are only concerned with diagonal entries (right image to right description)
+                batch_iit_preds = batch_iit_preds.diag()
+                if preds is None:
+                    preds = batch_iit_preds
+                else:
+                    preds = torch.cat([preds, batch_iit_preds])
+
+        # Make sure the model is back on the instance device:
+        self.device = old_device
+        self.model.set_device(self.device)
+        self.model.device = old_device
+
+        # NOTE: Adding result for regression and for CLIP
+        # (no need to take argmax)
+        if self.n_classes is None or self.n_classes == 1:
+            return preds.squeeze()
+
+        return preds.argmax(axis=1)
+
+

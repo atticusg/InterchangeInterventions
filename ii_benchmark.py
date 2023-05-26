@@ -306,7 +306,8 @@ class IIBenchmarkMoNli(IIBenchmark):
             target_layers=self.model_parameters['target_layers'],
             device=self.model_parameters['device'],
             static_search=self.model_parameters['static_search'],
-            nested_disentangle_inplace=self.model_parameters['nested_disentangle_inplace']
+            nested_disentangle_inplace=self.model_parameters['nested_disentangle_inplace'],
+            learned_intervention_size=self.model_parameters['learned_intervention_size']
         )
     def create_classifier(self, model):
         return BERTLIMTrainer(

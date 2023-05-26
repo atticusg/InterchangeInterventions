@@ -217,8 +217,9 @@ class LIMBERTClassifier(LayeredIntervenableModel):
                 target_dims=None,
                 target_layers=None,
                 static_search=False,
-                nested_disentangle_inplace=False
-                ):
+                nested_disentangle_inplace=False,
+                learned_intervention_size=None   # set to None in order to not learn an intervention
+         ):
         super().__init__(
             debug=debug,
             use_wrapper=use_wrapper,
@@ -245,6 +246,22 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         
         self.build_graph(self.model_layers, self.model_dim, static_search, nested_disentangle_inplace)
 
+        # NOTE: LEARN INTERVENTION BASED ON INPUT INTERVENTION SIZE
+        self.learned_intervention_size = learned_intervention_size
+        self.set_learn_intervention_vector(self.learned_intervention_size is not None)
+
+    # NOTE: AMIR'S ADDITION
+    def set_learn_intervention_vector(self, learn_intervention_vector):
+        self.learn_intervention_vector = learn_intervention_vector
+        if self.learn_intervention_vector:
+            self.intervention_vector = torch.nn.Parameter(torch.randn(self.learned_intervention_size))
+            self.freeze_model_parameters()
+            self.freeze_disentangling_parameters()
+        else:
+            # restore to original configuration
+            self.intervention_vector = None
+            self.set_analysis_mode(self.analysis)
+
     def freeze_model_parameters(self):
         """Freezes the model weights (for analysis purposes)"""
         for param in self.embeddings.parameters():
@@ -268,7 +285,7 @@ class LIMBERTClassifier(LayeredIntervenableModel):
             param.requires_grad = True
         super().freeze_model_parameters()
         
-    def forward(self, pair):
+    def forward(self, pair, output_hidden_states=False):
         """Computes a forward pass with input `X`."""
         X, mask = pair
         input_shape = X.size()
@@ -279,6 +296,8 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         else:
             output = self.normal_model(X, attention_mask=extended_attention_mask)[0]
         pooler_output = self.pooler(output)
+        if output_hidden_states:
+            return pooler_output
         return self.classifier_layer(pooler_output)
 
     def iit_forward(self,
@@ -337,6 +356,24 @@ class LIMBERTClassifier(LayeredIntervenableModel):
         return tuple([reps.reshape(original_shape)]\
                                 + [ _ for _ in output[1:]])
 
+    def forward_with_intervention(self, pair, intervention_ids_to_coords):
+        input_size = pair[0].size()
+
+        # NOTE: FOR NOW, ASSUME ONLY A SINGLE INTERVENTION AT 0
+        sets = copy.deepcopy(intervention_ids_to_coords[0])
+        for i, get in enumerate(sets):
+            # NOTE: by learning interventinon, we are completely ignoring the "clean" run
+            # repeat intervention to match batch size (1st dimension of input)
+            sets[i]['intervention'] = self.intervention_vector.repeat((input_size[0], 1))
+        
+        handlers = self._gets_sets(gets=None, sets=sets)
+        counterfactual_logits = self.forward(pair)
+        for handler in handlers:
+            handler.remove()
+        return counterfactual_logits
+
     def retrieval_wrapper(self, output, get):
         reps = output[0].reshape((output[0].shape[0], -1))
         return reps[:,get["start"]: get["end"] ]
+
+
