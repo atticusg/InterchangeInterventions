@@ -483,32 +483,42 @@ class LIMClipTextModel(LayeredIntervenableModel):
         return counterfactual_logits
 
     def intervention_wrapper(self, output, set):
-        sz = copy.deepcopy(output[0].shape)
-        st = set['start']
-        en = set['end']
+        if self.analysis:
+            result = torch.cat([
+                output[:, :set['start']],
+                set['intervention'],
+                output[:, set['end']:]
+            ], dim=1)
+            return result
+        else:
+            sz = copy.deepcopy(output[0].shape)
+            st = set['start']
+            en = set['end']
+            eot_indices = output[2]
 
-        eot_indices = output[2]
+            # admittedly, this is not very pretty code
+            # one day i will sit down and learn how to use indices in pytorch properly
+            # but for now, this will (hopefully) do
+            reps = torch.stack([
+                torch.cat((
+                    # everything before intervention for the i-th input in the batch
+                    output[0].flatten()[i*sz[1]*sz[2]:i*sz[1]*sz[2] + j*sz[2] + st],
+                    # intervention for i-th input
+                    set['intervention'][i],
+                    # everything after intervention for teh i-th input in the batch
+                    output[0].flatten()[i*sz[1]*sz[2] + j*sz[2] + en:(i+1)*sz[1]*sz[2]]
+                ))
+                for i, j in zip(torch.arange(output[0].size(0)), eot_indices)
+            ]).view(sz)
 
-        # admittedly, this is not very pretty code
-        # one day i will sit down and learn how to use indices in pytorch properly
-        # but for now, this will (hopefully) do
-        reps = torch.stack([
-            torch.cat((
-                # everything before intervention for the i-th input in the batch
-                output[0].flatten()[i*sz[1]*sz[2]:i*sz[1]*sz[2] + j*sz[2] + st],
-                # intervention for i-th input
-                set['intervention'][i],
-                # everything after intervention for teh i-th input in the batch
-                output[0].flatten()[i*sz[1]*sz[2] + j*sz[2] + en:(i+1)*sz[1]*sz[2]]
-            ))
-            for i, j in zip(torch.arange(output[0].size(0)), eot_indices)
-        ]).view(sz)
-
-        return tuple([reps] + list(output[1:]))
+            return tuple([reps] + list(output[1:]))
 
     def retrieval_wrapper(self, output, get):
-        eot_indices = output[2]
-        reps = output[0][
-            torch.arange(output[0].size(0)), eot_indices, get["start"]: get["end"]
-        ]
+        if self.analysis:
+            reps = output[:, get['start']:get['end']]
+        else:
+            eot_indices = output[2]
+            reps = output[0][
+                torch.arange(output[0].size(0)), eot_indices, get["start"]: get["end"]
+            ]
         return reps
