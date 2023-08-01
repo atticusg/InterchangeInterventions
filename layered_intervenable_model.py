@@ -30,7 +30,6 @@ class LayeredIntervenableModel(torch.nn.Module):
     def __init__(self,
             device=None,
             debug=False,
-            use_wrapper=False,
             target_dims=None,
             target_layers=None):
         """
@@ -69,7 +68,6 @@ class LayeredIntervenableModel(torch.nn.Module):
         self.device = torch.device(device)
         self.debug = debug
         self.combiner = torch.nn.Sequential
-        self.use_wrapper = use_wrapper
         self.target_dims = target_dims
         self.target_layers = target_layers
 
@@ -195,10 +193,7 @@ class LayeredIntervenableModel(torch.nn.Module):
         #retrieve the value of interventions by feeding in the source inputs
         for i, get in enumerate(gets):
             handlers = self._gets_sets(gets =[get],sets = None)
-            # NOTE: not sure why we need a new source for every alignment location,
-            # so changing this to just take the first (and only?) source
-            # source_logits = self.forward(sources[i])
-            source_logits = self.forward(sources[0])
+            source_logits = self.forward(sources[i])
             for handler in handlers:
                 handler.remove()
             sets[i]["intervention"] =\
@@ -211,12 +206,6 @@ class LayeredIntervenableModel(torch.nn.Module):
             handler.remove()
         return counterfactual_logits
 
-    def intervention_wrapper(self, output, set):
-        raise "Not Imlemented Error"
-
-    def retrieval_wrapper(self, output, set):
-        raise "Not Imlemented Error"
-
     def intervention(self, output, set):
         return torch.cat([output[:,:set["start"]], set["intervention"],
                             output[:,set["end"]:]],
@@ -225,7 +214,7 @@ class LayeredIntervenableModel(torch.nn.Module):
     def retrieval(self, output, get):
         return output[:,get["start"]: get["end"] ]
 
-    def make_hook(self, gets, sets, layer, use_wrapper=False):
+    def make_hook(self, gets, sets, layer):
         """
         Returns a function that both retrieves the output values of a module it
         is registered too according to the coordinates in `gets` and also fixes
@@ -234,27 +223,22 @@ class LayeredIntervenableModel(torch.nn.Module):
         """
         def hook(model, input, output):
             layer_gets, layer_sets = [], []
+
             if gets is not None:
                 for get in gets:
                     if layer == get["layer"]:
                         layer_gets.append(get)
             for get in layer_gets:
-                if use_wrapper:
-                    self.activation[f'{get["layer"]}-{get["start"]}-{get["end"]}']\
-                        = self.retrieval_wrapper(output, get)
-                else:
-                    self.activation[f'{get["layer"]}-{get["start"]}-{get["end"]}']\
-                        = self.retrieval(output, get)
+                self.activation[f'{get["layer"]}-{get["start"]}-{get["end"]}']\
+                    = self.retrieval(output, get)
 
             if sets is not None:
                 for set in sets:
                     if layer == set["layer"]:
                         layer_sets.append(set)
             for set in layer_sets:
-                if use_wrapper:
-                    output = self.intervention_wrapper(output, set)
-                else:
-                    output = self.intervention(output, set)
+                output = self.intervention(output, set)
+
             return output
         return hook
 
@@ -270,10 +254,10 @@ class LayeredIntervenableModel(torch.nn.Module):
                 if "disentangle" in layer:
                     handler = layer["disentangle"].register_forward_hook(hook)
                 else:
-                    hook = self.make_hook(gets,sets, layer_num, use_wrapper=self.use_wrapper)
+                    hook = self.make_hook(gets,sets, layer_num)
                     handler = layer["model"].register_forward_hook(hook)
             else:
-                hook = self.make_hook(gets,sets, layer_num, use_wrapper=self.use_wrapper)
+                hook = self.make_hook(gets,sets, layer_num)
                 handler = layer["model"].register_forward_hook(hook)
             handlers.append(handler)
         return handlers

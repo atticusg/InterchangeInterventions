@@ -183,14 +183,6 @@ class LIMTrainer:
 
     def build_iit_dataset(self, base, base_y, iit_data):
         sources, IIT_y, intervention_ids = iit_data
-        base = torch.FloatTensor(np.array(base))
-        sources = [torch.FloatTensor(np.array(source)) for source in sources]
-        sources = torch.reshape(
-            torch.stack(sources, dim=1),
-            (-1, len(sources),
-            sources[0].shape[1]))
-
-        intervention_ids = torch.FloatTensor(np.array(intervention_ids))
 
         if not torch.is_tensor(base_y):
             base_y = np.array(base_y)
@@ -374,7 +366,7 @@ class LIMTrainer:
                                     intervention_ids_to_coords)
                     if self.blackout_classes is None:
                          # same casting done over here
-                        err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
+                        err += self.loss(batch_iit_preds, iit_labels_batch.flatten().to(torch.long))
                     else:
                         err += self.loss(batch_iit_preds[self.blackout_classes], iit_labels_batch[self.blackout_classes])
 
