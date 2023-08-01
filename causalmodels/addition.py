@@ -88,6 +88,66 @@ def highlevel_tall_model():
     pos["C4"] = (6-4.5,6)
     return CausalModel(variables, values, parents, functions,pos=pos)
 
+def highlevel_outputmediation():
+    variables = ["X5", "X4", "X3", "X2", "X1",
+                "Y5", "Y4", "Y3", "Y2", "Y1",
+                "W6","W5", "W4", "W3", "W2", "W1",
+        "O6", "O5", "O4", "O3", "O2", "O1"]
+    values = {variable:[_ for _ in range(10)] for variable in variables}
+
+    parents = { _ : [] for _ in variables[:10]}
+
+    for i in range(1, 5):
+        parents["W"+str(i)] = ["X5", "X4", "X3", "X2", "X1",
+                                "Y5", "Y4", "Y3", "Y2", "Y1"]
+
+    for i in range(1, 6):
+        parents["O"+str(i)] = ["W"+ str(i)]
+
+    def FILLER():
+        return 0
+
+    def W1(x,y):
+        return (x+y) % 10
+
+    def W2(x,y):
+        return (x+y) % 10
+
+    def W1(x,y):
+        return (x+y) % 10
+
+    def W1(x,y):
+        return (x+y) % 10
+
+    def W1(x,y):
+        return (x+y) % 10
+
+    def W1(x,y):
+        return (x+y) % 10
+
+
+    def O(w):
+        return w
+
+    functions = { _ : FILLER for _ in variables[:10]}
+
+    for i in range(1, 6):
+        functions["W"+str(i)] = O
+        functions["O"+str(i)] = O
+
+    functions["O6"] = O6
+    pos = dict()
+    for i in range(1,6):
+        pos["X"+str(i)] = (6-i,0)
+        pos["Y"+str(i)] = (5.5-i,1)
+        pos["O"+str(i)] = (6-i,7)
+    pos["O"+str(6)] = (6-6,7)
+    pos["C1"] = (6-1.5,3)
+    pos["C2"] = (6-2.5,4)
+    pos["C3"] = (6-3.5,5)
+    pos["C4"] = (6-4.5,6)
+    return CausalModel(variables, values, parents, functions,pos=pos)
+
 def highlevel_flat_model():
     variables = ["X5", "X4", "X3", "X2", "X1",
                 "Y5", "Y4", "Y3", "Y2", "Y1",
@@ -179,35 +239,6 @@ def highlevel_nocarry_model():
     pos["O"+str(6)] = (6-6,7)
     return CausalModel(variables, values, parents, functions, pos=pos)
 
-def get_filter(partial_setting):
-    def compare(total_setting):
-        for var in partial_setting:
-            if total_setting[var] != partial_setting[var]:
-                return False
-        return True
-    return compare
-
-def get_path_maxlen_filter(model, lengths):
-    def check_path(total_setting):
-        input = {var:total_setting[var] for var in model.inputs}
-        paths = model.find_live_paths(input)
-        m = max([l for l in paths.keys() if len(paths[l]) != 0])
-        if m in lengths:
-            return True
-        return False
-    return check_path
-
-def get_specific_path_filter(model, start,end):
-    def check_path(total_setting):
-        input = {var:total_setting[var] for var in model.inputs}
-        paths = model.find_live_paths(input)
-        for k in paths:
-            for path in paths[k]:
-                if path[0]==start and path[-1]==end:
-                    return True
-        return False
-    return check_path
-
 def sample_nine_sum():
     TEMP = [(x,y) for x in range(10) for y in range(10) if x + y == 9]
     return random.sample(TEMP,1)[0]
@@ -216,23 +247,25 @@ def sample_nonine_sum():
     TEMP = [(x,y) for x in range(10) for y in range(10) if x + y != 9]
     return random.sample(TEMP,1)[0]
 
-def sample_live_circuit(carry, out):
-    def sampler():
-        x = 0
-        y = 0
-        for i in range(1,6):
-            xn,yn = None, None
-            if i > carry and i < out:
-                xn, yn = sample_nine_sum()
-            elif i == carry or i == out:
-                xn, yn = sample_nonine_sum()
-            else:
-                xn, yn = random.randint(0,9),random.randint(0,9)
-            x += xn * 10**(i-1)
-            y += yn * 10**(i-1)
-        return pairToInput(x,y)
-    return sampler
+def sample_balanced_nines():
+    carry, output = random.sample([(c,o) for c in range(1,5) for o in range(1,6) if o - c >= 2])
+    return sample_live_circuit(carry,output)
 
+
+def sample_live_circuit(carry, out):
+    x = 0
+    y = 0
+    for i in range(1,6):
+        xn,yn = None, None
+        if i > carry and i < out:
+            xn, yn = sample_nine_sum()
+        elif i == carry or i == out:
+            xn, yn = sample_nonine_sum()
+        else:
+            xn, yn = random.randint(0,9),random.randint(0,9)
+        x += xn * 10**(i-1)
+        y += yn * 10**(i-1)
+    return pairToInput(x,y)
 
 def get_circuit_samplers():
     result = {"O" + str(i):dict() for i in range(1,7)}

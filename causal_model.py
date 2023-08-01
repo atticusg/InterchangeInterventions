@@ -1,13 +1,23 @@
 import random
 import copy
 import inspect
+import itertools
+import torch
 from collections import defaultdict
 import networkx as nx
 import matplotlib.pyplot as plt
 
 class CausalModel:
-    def __init__(self, variables, values, parents, functions, timesteps = None, pos = None):
+    def __init__(self,
+                variables,
+                values,
+                parents,
+                functions,
+                timesteps = None,
+                equiv_classes=None,
+                pos = {}):
         self.variables = variables
+        self.variables.sort()
         self.values= values
         self.parents = parents
         self.children = {var:[] for var in variables}
@@ -37,6 +47,7 @@ class CausalModel:
             if len(self.parents) == 0:
                 self.start_variables.add(variable)
 
+
         self.inputs = [ var  for var in self.variables if len(parents[var])==0]
         self.outputs = copy.deepcopy(variables)
         for child in variables:
@@ -60,6 +71,18 @@ class CausalModel:
                 pos[var] = (width[self.timesteps[var]], self.timesteps[var])
                 width[self.timesteps[var]] += 1
 
+        if equiv_classes is not None:
+            self.equiv_classes = equiv_classes
+        else:
+            self.equiv_classes = {}
+        for var in self.variables:
+            if var in self.inputs or var in self.equiv_classes:
+                continue
+            self.equiv_classes[var] = {val:[] for val in self.values[var]}
+            for parent_values in itertools.product(*[self.values[par] for par in self.parents[var]]):
+                value = self.functions[var](*parent_values)
+                self.equiv_classes[var][value].append({par:parent_values[i] for i,par in enumerate(self.parents[var])})
+
 
     def generate_timesteps(self):
         timesteps = {input:0 for input in self.inputs}
@@ -79,7 +102,7 @@ class CausalModel:
             assert var in timesteps
         return timesteps, step-1
 
-    def marginalize(self, tumor):
+    def marginalize(self, target):
         #TODO
         for var in tumor:
             return None
@@ -145,6 +168,14 @@ class CausalModel:
             length = len(list(total_setting.keys()))
         return total_setting
 
+    def run_interchange(self, input, source_interventions):
+        interchange_intervention = input
+        for var in source_interventions:
+            setting = self.run_forward(source_interventions[var])
+            interchange_intervention[var] = setting[var]
+        return self.run_forward(interchange_intervention)
+
+
     def add_variable(self, variable, values, parents, children, function, timestep=None):
         if timestep is not None:
             assert self.timesteps is not None
@@ -158,6 +189,16 @@ class CausalModel:
         self.values[variable] = values
         self.functions[variable] = function
 
+    def sample_intervention(self, mandatory=None):
+        intervention = {}
+        while len(intervention.keys()) == 0:
+            for var in self.variables:
+                if var in self.inputs or var in self.outputs:
+                    continue
+                if random.choice([0,1]) == 0:
+                    intervention[var] = random.choice(self.values[var])
+        return intervention
+
     def sample_input(self, mandatory=None):
         input = {var: random.sample(self.values[var],1)[0] for var in self.inputs}
         total = self.run_forward(intervention=input)
@@ -165,6 +206,118 @@ class CausalModel:
             input = {var: random.sample(self.values[var],1)[0] for var in self.inputs}
             total = self.run_forward(intervention=input)
         return input
+
+    def sample_input_tree_balanced(self, output_var = None):
+        assert output_var is not None or len(self.outputs) == 1
+        if output_var is None:
+            output_var = self.outputs[0]
+        def create_input(var,value, input = {}):
+            parent_values = random.choice(self.equiv_classes[var][value])
+            for parent in parent_values:
+                if parent in self.inputs:
+                    input[parent] = parent_values[parent]
+                else:
+                    create_input(parent, random.choice(self.values[parent]), input)
+            return input
+        return create_input(output_var, random.choice(self.values[output_var]))
+
+    def get_path_maxlen_filter(self,lengths):
+        def check_path(total_setting):
+            input = {var:total_setting[var] for var in self.inputs}
+            paths = self.find_live_paths(input)
+            m = max([l for l in paths.keys() if len(paths[l]) != 0])
+            if m in lengths:
+                return True
+            return False
+        return check_path
+
+    def get_partial_filter(self,partial_setting):
+        def compare(total_setting):
+            for var in partial_setting:
+                if total_setting[var] != partial_setting[var]:
+                    return False
+            return True
+        return compare
+
+    def get_specific_path_filter(self,start,end):
+        def check_path(total_setting):
+            input = {var:total_setting[var] for var in self.inputs}
+            paths = self.find_live_paths(input)
+            for k in paths:
+                for path in paths[k]:
+                    if path[0]==start and path[-1]==end:
+                        return True
+            return False
+        return check_path
+
+    def inputToTensor(self, setting):
+        result = []
+        for input in self.inputs:
+            temp = torch.tensor(setting[input]).float()
+            if len(temp.size()) == 0:
+                temp = torch.reshape(temp,(1,))
+            result.append(temp)
+        return torch.cat(result)
+
+    def outputToTensor(self, setting):
+        result = []
+        for output in self.outputs:
+            temp = torch.tensor(float(setting[output]))
+            if len(temp.size()) == 0:
+                temp = torch.reshape(temp,(1,))
+            result.append(temp)
+        return torch.cat(result)
+
+    def generate_factual_dataset(self, size, sampler=None, filter=None):
+        if sampler is None:
+            sampler = self.sample_input
+        X,y = [],[]
+        count = 0
+        while count < size:
+            input = sampler()
+            if filter is None or filter(input):
+                X.append(self.inputToTensor(input))
+                y.append(self.outputToTensor(self.run_forward(input)))
+                count += 1
+        return torch.stack(X), torch.stack(y)
+
+    def generate_counterfactual_dataset(self,
+                                        size,
+                                        intervention_id,
+                                        batch_size,
+                                        sampler=None,
+                                        intervention_sampler=None,
+                                        filter=None):
+        maxlength = len([var for var in self.variables if var not in self.inputs and var not in self.outputs ])
+        if sampler is None:
+            sampler = self.sample_input
+        if intervention_sampler is None:
+            intervention_sampler = self.sample_intervention
+        bases, y, sourceses, yii,interventions = [], [], [], [], []
+        count = 0
+        while count < size:
+            intervention = intervention_sampler()
+            if filter is None or filter(intervention):
+                for _ in range(batch_size):
+                    base = sampler()
+                    sources = []
+                    source_dic = {}
+                    for var in self.variables:
+                        if var not in intervention:
+                            continue
+                        source = sampler()
+                        sources.append(self.inputToTensor(source))
+                        source_dic[var] = source
+                    for _ in range(maxlength - len(sources)):
+                        sources.append(torch.zeros(self.inputToTensor(self.sample_input()).shape))
+                    y.append(self.outputToTensor(self.run_forward(base)))
+                    yii.append(self.outputToTensor(self.run_interchange(base, source_dic)))
+                    bases.append(self.inputToTensor(base))
+                    sources = torch.stack(sources)
+                    sourceses.append(sources)
+                    interventions.append(torch.tensor([intervention_id(intervention)]))
+                    count += 1
+        return torch.stack(bases), torch.stack(y), torch.stack(sourceses), torch.stack(yii), torch.stack(interventions)
 
 def simple_example():
     variables = ["A", "B", "C"]
