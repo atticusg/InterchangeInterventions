@@ -18,7 +18,7 @@ class LinearLayer(torch.nn.Module):
         self.weight = torch.nn.Parameter(
             torch.empty(n,n).to(device), requires_grad=True)
         if static_search:
-            self.weight.data = torch.eye(self.weight.data.shape[0])
+            self.weight.data = torch.eye(self.weight.data.shape[0]).to(device)
         else:
             torch.nn.init.orthogonal_(self.weight)
 

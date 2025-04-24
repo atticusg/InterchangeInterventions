@@ -1,13 +1,29 @@
+import random
+import json
 import copy
 from typing import Optional
 import numpy as np
+import pandas as pd
 import pickle
 from sklearn.model_selection import train_test_split
 import torch
 import torch.nn as nn
+from transformers import AutoTokenizer
 import utils
-
 from tqdm import tqdm
+import wandb 
+
+from flickr8k import evaluate_on_flickr8k
+from food101 import evaluate_on_food101
+from imagenet1k import evaluate_on_imagenet
+from country211 import evaluate_on_country211
+from cifar100 import evaluate_on_cifar100
+from cosid import evaluate_on_cosid
+
+CONCADIA_PATH = 'concadia.pt' 
+CONCADIA_METADATA_PATH = 'wiki_split.json'
+COLUMNS = ['filename', 'caption', 'description', 'image_features']
+SEED = 42
 
 def contrastive_loss(logits: torch.Tensor, labels: Optional[torch.Tensor] = None) -> torch.Tensor:
     if labels is not None:
@@ -19,6 +35,166 @@ def clip_iit_loss(similarity: torch.Tensor, labels: Optional[torch.Tensor] = Non
     iit_loss = contrastive_loss(similarity, labels)
     return iit_loss
 
+class IITConcadiaDataset:
+    def __init__(self, embed_func, split):
+        self.embed_func = embed_func
+        self.split = split
+        concadia_data = torch.load(CONCADIA_PATH, map_location='cpu')
+        concadia_df = pd.DataFrame(concadia_data, columns=COLUMNS).set_index('filename')
+        with open(CONCADIA_METADATA_PATH) as f:
+            concadia_metadata = json.load(f)['images']
+        train_filenames = [im_data['filename'] for im_data in concadia_metadata if im_data['split'] == 'train']
+        val_filenames = [im_data['filename'] for im_data in concadia_metadata if im_data['split'] == 'val']
+        test_filenames = [im_data['filename'] for im_data in concadia_metadata if im_data['split'] == 'test']
+        self.train_df = concadia_df.loc[train_filenames]
+        self.val_df = concadia_df.loc[val_filenames]
+        self.test_df = concadia_df.loc[test_filenames]
+
+        if split == 'train':
+            self.concadia_df = self.train_df
+        elif split == 'val':
+            self.concadia_df = self.val_df
+        else:
+            self.concadia_df = self.test_df
+
+    def get_intervention(self, base, source):
+        return 0
+
+    def create_dataset(self, shuffle=True):
+        data = []
+        for i, row in self.concadia_df.iterrows():
+            image_embeds = row['image_features']
+            base, source = row['caption'], row['description']
+            base_x, base_mask = self.embed_func(base)
+            source_x, source_mask = self.embed_func(source)
+            base_label = 0   # base label ignored during training
+            intervention = self.get_intervention(base, source)
+            IIT_label = 1    # 0 - prefer base input; 1 - prefer intervened input
+            data.append((base_x, base_mask, base_label, source_x, source_mask, IIT_label, intervention, image_embeds))
+
+            # repeat but with swapped base and source
+            base, source = row['description'], row['caption']
+            base_x, base_mask = self.embed_func(base)
+            source_x, source_mask = self.embed_func(source)
+            base_label = 0
+            intervention = self.get_intervention(base, source)
+            IIT_label = 0   # 0 - prefer base input; 1 - prefer intervened input
+            data.append((base_x, base_mask, base_label, source_x, source_mask, IIT_label, intervention, image_embeds))
+
+        if shuffle:
+            # data.sort(key=lambda x: x[-2])
+            # NOTE: JUST FOR FINETUNING
+            # keep data in pairs, since the learning objective implicitly relies on this
+            print('Shuffling data...')
+            paired_data = [data[i:i+2] for i in range(0, len(data), 2)]
+            random.shuffle(paired_data)
+            data = [d for p in paired_data for d in p]
+
+        base, base_mask, y, source, source_mask, IIT_y, interventions, image_embeds = zip(*data)
+        self.base = base
+        self.base_mask = base_mask
+        self.source = source
+        self.source_mask = source_mask
+        self.y = np.array(y)
+        self.IIT_y = np.array(IIT_y)
+        self.interventions = np.array(interventions)
+        self.image_embeds = image_embeds
+        return (
+            (self.base, self.base_mask, self.image_embeds), 
+            self.y, 
+            [(self.source,self.source_mask, self.image_embeds)], 
+            self.IIT_y, 
+            self.interventions
+        )
+
+def get_IIT_concadia_dataset(
+    tokenizer_name,
+    split="train",
+    shuffle=True
+):
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+    
+    def encoding(X):
+        input = [X]
+        data = tokenizer(
+            input,
+            max_length=77,
+            add_special_tokens=True,
+            padding='max_length',
+            truncation=True,
+            return_attention_mask=True,
+            return_tensors='pt'
+        )
+        indices = data['input_ids']
+        mask = data['attention_mask']
+        return (indices, mask)
+    
+    dataset = IITConcadiaDataset(
+        embed_func=encoding,
+        split=split
+    )
+    
+    X_base, y_base, X_sources,  y_IIT, interventions = dataset.create_dataset(shuffle=shuffle)
+    y_base = torch.tensor(y_base)
+    y_IIT = torch.tensor(y_IIT)
+    interventions = torch.tensor(interventions)
+    return X_base, y_base, X_sources, y_IIT, interventions
+
+TEST_DATASET_IIT = get_IIT_concadia_dataset(
+    split="test",
+    tokenizer_name='openai/clip-vit-base-patch32',
+    shuffle=False
+)
+
+def evaluate(clip_trainer, outdir, step, use_wandb=False):
+    X_base_test = TEST_DATASET_IIT[0]
+    
+    print(f'Evaluating on concadia test ({step})...')
+    base_preds_test = clip_trainer.predict(
+        X_base_test
+    )
+    
+    base_preds_test = base_preds_test.view((-1, 2))
+    y_preds_test = base_preds_test.argmax(dim=-1).detach().cpu().numpy()
+    bias = y_preds_test.mean()
+
+    print(f"Evaluating on flickr8k ({step})...")
+    flickr8k_eval = evaluate_on_flickr8k(clip_trainer.model)
+    # print(f"Evaluating on food101 ({step})...")
+    # food101_eval = evaluate_on_food101(clip_trainer.model)
+    # print(f"Evaluating on imagenet ({step})...")
+    # imagenet_eval = evaluate_on_imagenet(clip_trainer.model)
+    # print(f"Evaluating on country211 ({step})...")
+    # country211_eval = evaluate_on_country211(clip_trainer.model)
+    # print(f"Evaluating on cifar100 ({step})...")
+    # cifar100_eval = evaluate_on_cifar100(clip_trainer.model)
+
+    with torch.no_grad():
+        norms = [p.norm() for n, p in clip_trainer.model.named_parameters() if 'lora' in n]
+        if len(norms) > 0:
+            norm = sum(norms) / len(norms)
+        else:
+            norm = 0
+
+    logs = {
+        'eval_flickr8k': flickr8k_eval.correlation[0],
+        # 'eval_food101': food101_eval,
+        # 'eval_imagenet': imagenet_eval,
+        # 'eval_country211': country211_eval,
+        # 'eval_cifar100': cifar100_eval,
+        'eval_accuracy': bias,
+        'lora_norm': norm
+    }
+
+    # cosid_correlations, length_correlation = evaluate_on_cosid(clip_trainer.model)
+    # for i, r in cosid_correlations.iterrows():
+    #     logs[f'{r.Group} - {r.Aspect}'] = r.PearsonR
+
+    if use_wandb:
+        wandb.log(logs)
+    else:
+        with open(f'{outdir}/evaluation_{step}.csv', 'w+'):
+            json.dump(logs)
 
 class LIMTrainer:
     def __init__(self,
@@ -42,6 +218,7 @@ class LIMTrainer:
             input_as_ids=False,
             class2index=None,
             seed=42,
+            num_iter_per_val=1000,
             **optimizer_kwargs):
         """
         Base class for all the PyTorch-based models.
@@ -166,6 +343,7 @@ class LIMTrainer:
         self.n_iter_no_change = n_iter_no_change
         self.tol = tol
         self.first_run = True
+        self.num_iter_per_val = num_iter_per_val
 
         # NOTE: INTRODUCE MSE LOSS FOR REGRESSION, CLIP LOSS FOR CONTRASTIVE LEARNING
         self.n_classes = self.model.n_classes
@@ -175,7 +353,7 @@ class LIMTrainer:
             self.loss = nn.MSELoss(reduction='mean')
         else:
             self.loss = nn.CrossEntropyLoss(reduction="mean")
-        
+
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
@@ -205,13 +383,13 @@ class LIMTrainer:
             for k, v in class2index.items():
                 self.index2class[v] = k
         self.seed = seed
-        
+
     def build_iit_dataset(self, base, base_y, iit_data):
         sources, IIT_y, intervention_ids = iit_data
         if not self.input_as_ids:
             base = torch.FloatTensor(np.array(base))
             sources = [torch.FloatTensor(np.array(source)) for source in sources]
-            
+
         sources = torch.reshape(
             torch.stack(sources, dim=1),
             (-1, len(sources),
@@ -222,7 +400,7 @@ class LIMTrainer:
         base_y = np.array(base_y)
         self.classes_ = sorted(set(base_y))
         self.n_classes_ = len(self.classes_)
-        
+
         if self.class2index is not None:
             base_y = [self.class2index[label] for label in base_y]
         else:
@@ -249,14 +427,14 @@ class LIMTrainer:
         base_y = np.array(base_y)
         self.classes_ = sorted(set(base_y))
         self.n_classes_ = len(self.classes_)
-        
+
         if self.class2index is not None:
             base_y = [self.class2index[label] for label in base_y]
         else:
             class2index = dict(zip(self.classes_, range(self.n_classes_)))
             base_y = [class2index[label] for label in base_y]
         base_y = torch.tensor(base_y)
-        
+
         dataset = torch.utils.data.TensorDataset(base_x, base_y)
         return dataset
 
@@ -286,10 +464,14 @@ class LIMTrainer:
              base,
              base_labels,
              iit_data=None,
+             base_val=None,
+             base_labels_val=None,
+             iit_data_val=None,
              intervention_ids_to_coords=None,
              device=None,
-             save_checkpoint_per_epoch_overwrite=False,
-             save_checkpoint_prefix=None,
+             outdir=None,
+             use_wandb=False,
+             multitask=-1.
            ):
         """
         Generic optimization method.
@@ -362,10 +544,20 @@ class LIMTrainer:
         self
 
         """
-        if self.early_stopping:
-            args, dev = self._build_validation_split(
-                *args, validation_fraction=self.validation_fraction)
+        # if self.early_stopping:
+            # args, dev = self._build_validation_split(
+            #     *args, validation_fraction=self.validation_fraction)
 
+        # build validation dataloader if provided validation data
+        if iit_data_val is not None:
+            dataset_val = self.build_iit_dataset(base_val, base_labels_val, iit_data_val)
+            dataloader_val = self._build_dataloader(dataset_val, shuffle=False)
+        elif base_val is not None:
+            dataset_val = self.build_dataset(base_val, base_labels_val)
+            dataloader_val = self._build_dataloader(dataset_val, shuffle=False)
+        else:
+            dataloader_val = None
+        
         # Dataset:
         if iit_data is not None:
             dataset = self.build_iit_dataset(base, base_labels, iit_data)
@@ -386,12 +578,14 @@ class LIMTrainer:
         self.model.train()
         self.optimizer.zero_grad()
 
-        for iteration in range(1, self.max_iter+1):
-
-            epoch_error = 0.0
-
-            with tqdm(dataloader, desc=f'Epoch {iteration}') as pbar:
-                for batch_num, batch in enumerate(pbar, start=1):
+        # for iteration in range(1, self.max_iter+1):
+        # epoch_error = 0.0
+        
+        epoch = 0
+        while epoch < self.max_iter:
+            epoch += 1
+            with tqdm(dataloader, desc=f'Epoch {epoch}') as pbar:
+                for batch_num, batch in enumerate(pbar):
                     batch = [x.to(self.device) for x in batch]
                     base_batch, base_labels_batch  = self.process_batch(batch)
 
@@ -425,11 +619,18 @@ class LIMTrainer:
                     if iit_data is not None:
                         sources_batch, iit_labels_batch, intervention_ids_batch \
                             = self.process_IIT_batch(batch)
-                        
+
                         if self.model.learn_intervention_vector:
                             batch_iit_preds = self.model.forward_with_intervention(
                                 sources_batch, intervention_ids_to_coords
                             )
+                        # elif self.model.multitask_objective:
+                        #     batch_iit_preds, multitask_preds = self.model.iit_forward(
+                        #         base_batch,
+                        #         sources_batch,
+                        #         intervention_ids_batch,
+                        #         intervention_ids_to_coords
+                        #     )
                         else:
                             batch_iit_preds = self.model.iit_forward(
                                 base_batch,
@@ -443,6 +644,21 @@ class LIMTrainer:
                             iit_preds = batch_iit_preds.diag()
                             preds = torch.stack((base_preds, iit_preds)).t()
                             err = self.loss(preds, iit_labels_batch.to(torch.long))
+
+                            # for multitask objective, run finetuning objective
+                            # but on source vs. base inputs (i.e., input-level intervention)
+                            # (can't directly apply finetuning objective like above, b/c it implicitly
+                            # relies on captions & descriptions to be consecutive batch inputs)
+                            if multitask >= 0:
+                                source_preds = self.model(sources_batch).diag()
+                                behavioral_preds = torch.stack((base_preds, source_preds)).t()
+                                behavioral_err = self.loss(behavioral_preds, iit_labels_batch.to(torch.long))
+                                err = multitask * err + (1 - multitask) * behavioral_err
+
+                            # if self.model.multitask_objective:
+                            #     # compute multitask objective as whether we predicted the correct labels
+                            #     multitask_err = self.loss(multitask_preds, base_labels_batch.to(torch.long))
+                            #     err = err + multitask_err
                         elif self.model.learn_intervention_vector:
                             err = self.loss(batch_preds.squeeze(), batch_iit_preds.squeeze())
 
@@ -450,61 +666,67 @@ class LIMTrainer:
                             err += self.loss(batch_iit_preds.squeeze(), iit_labels_batch.to(torch.float).squeeze())
                         else:
                             err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
+                            
                     if self.gradient_accumulation_steps > 1 and \
                     self.loss.reduction == "mean":
                         err /= self.gradient_accumulation_steps
 
+                    self.errors.append(err.item())
+
+                    pbar.set_postfix({'loss': err.item()})
+
+                    if use_wandb:
+                        wandb.log({"train_loss": err.item()})
+
                     err.backward()
 
-                    epoch_error += err.item()
-                    pbar.set_postfix({'loss': err.item(), 'epoch_loss': epoch_error})
+                    # if self.early_stopping:
+                    #     self._update_no_improvement_count_errors(err.item())
+                    #     if self.no_improvement_count > self.n_iter_no_change:
+                    #         utils.progress_bar(
+                    #             "Stopping after epoch {}. Training loss did "
+                    #             "not improve more than tol={}. Final error "
+                    #             "is {}.".format(iteration, self.tol, err.item()),
+                    #             verbose=self.display_progress)
+                    #         break
 
                     if batch_num % self.gradient_accumulation_steps == 0 or \
-                    batch_num == len(dataloader):
+                        batch_num == len(dataloader):
                         if self.max_grad_norm is not None:
                             torch.nn.utils.clip_grad_norm_(
                                 self.model.parameters(), self.max_grad_norm)
                         self.optimizer.step()
                         self.optimizer.zero_grad()
-            
-            if save_checkpoint_per_epoch_overwrite:
-                PATH = f"{save_checkpoint_prefix}-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
-                torch.save(self.model.state_dict(), PATH)
-            # Saving checkpoints:
-            # if iteration % 50 == 0:
-            if iteration % 5 == 0:
-                if self.save_checkpoint_per_epoch:
-                    # PATH = f"./saved_models_arithmetic/basemodel-{iteration}-{self.model.num_layers}-{self.model.hidden_dim}-{self.seed}.bin"
-                    PATH = f'./saved_models/blackbox-{iteration}-{self.seed}.bin'
-                    torch.save(self.model.state_dict(), PATH)
-            
-            # Stopping criteria:
 
-            if self.early_stopping:
-                self._update_no_improvement_count_early_stopping(*dev)
-                if self.no_improvement_count > self.n_iter_no_change:
-                    utils.progress_bar(
-                        "Stopping after epoch {}. Validation score did "
-                        "not improve by tol={} for more than {} epochs. "
-                        "Final error is {}".format(iteration, self.tol,
-                            self.n_iter_no_change, epoch_error),
-                        verbose=self.display_progress)
-                    break
-
-            else:
-                self._update_no_improvement_count_errors(epoch_error)
-                if self.no_improvement_count > self.n_iter_no_change:
-                    utils.progress_bar(
-                        "Stopping after epoch {}. Training loss did "
-                        "not improve more than tol={}. Final error "
-                        "is {}.".format(iteration, self.tol, epoch_error),
-                        verbose=self.display_progress)
-                    break
-
-            utils.progress_bar(
-                "Finished epoch {} of {}; error is {}".format(
-                    iteration, self.max_iter, epoch_error),
-                verbose=self.display_progress)
+                    # Stopping criteria:
+                    if dataloader_val is not None and batch_num % self.num_iter_per_val == 0:
+                        self._update_no_improvement_count_early_stopping(
+                            dataloader=dataloader_val,
+                            is_iit=(iit_data_val is not None),
+                            intervention_ids_to_coords=intervention_ids_to_coords,
+                            use_wandb=use_wandb
+                        )
+                        if self.early_stopping and self.no_improvement_count >= self.n_iter_no_change:
+                            # utils.progress_bar(
+                            #     "Stopping after epoch {}. Validation score did "
+                            #     "not improve by tol={} for more than {} epochs. "
+                            #     "Final validation error is {}".format(iteration, self.tol, self.n_iter_no_change, self.best_score),
+                            #     verbose=self.display_progress)
+                            print('Final error:', self.best_score)
+                            utils.progress_bar(
+                                f'Stopping after {batch_num} batches. Validation score '
+                                f'did not improve by tol={self.tol} for more than {self.n_iter_no_change} epochs.'
+                                f'Final validation error is {self.best_score}.',
+                                verbose=self.display_progress
+                            )
+                            # end training
+                            running = False
+                            break
+                    
+                    num_iter_per_step = self.num_iter_per_val # (self.num_iter_per_val // 5)
+                    if batch_num % num_iter_per_step == 0:
+                        n = (epoch - 1) * (len(pbar) // num_iter_per_step) + batch_num // num_iter_per_step
+                        evaluate(self, outdir, n, use_wandb=use_wandb)
 
         if self.early_stopping:
             self.model.load_state_dict(self.best_parameters)
@@ -526,7 +748,7 @@ class LIMTrainer:
         self.validation_scores = []
         self.no_improvement_count = 0
         self.best_error = np.inf
-        self.best_score = -np.inf
+        self.best_score = np.inf
         self.best_parameters = None
 
     @staticmethod
@@ -591,7 +813,13 @@ class LIMTrainer:
             collate_fn=collate_fn)
         return dataloader
 
-    def _update_no_improvement_count_early_stopping(self, *dev):
+    def _update_no_improvement_count_early_stopping(
+        self, 
+        dataloader, 
+        is_iit,
+        intervention_ids_to_coords,
+        use_wandb=False
+    ):
         """
         Internal method used by `fit` to control early stopping.
         The method uses `self.score(*dev)` for scoring and updates
@@ -599,19 +827,75 @@ class LIMTrainer:
         `self.best_score`, `self.best_parameters` as appropriate.
 
         """
-        score = self.score(*dev)
+        self.model.eval()
+        score = 0.
+
+        with torch.no_grad():
+            with tqdm(dataloader, desc='Validating...') as pbar:
+                for batch_num, batch in enumerate(pbar, start=1):
+                    batch = [x.to(self.device) for x in batch]
+                    base_batch, base_labels_batch  = self.process_batch(batch)
+
+                    batch_preds = self.model(base_batch)
+
+                    base_labels_batch = torch.squeeze(base_labels_batch)
+
+                    # NOTE: Converting int to long for CE, adding MSE loss case
+                    # if learning intervention vector, do not rely on labels during training
+                    if self.n_classes is None:
+                        # evaluate non-IIT loss by comparing descriptions and captions
+                        # base labels can be read by the index of the first logit (specifically for our implementation of CLIP)
+                        if not is_iit:
+                            # NOTE: this relies on the IIT dataset pairing description + caption pairs right next to each other!
+                            base_labels_batch = base_labels_batch.view(-1, 2)[:, 0]
+                            base_preds = batch_preds.diag().view(base_labels_batch.size(0), 2)
+                            err = self.loss(base_preds, base_labels_batch.to(torch.long))
+
+                    elif self.n_classes == 1:
+                        err = self.loss(batch_preds.squeeze(), base_labels_batch.to(torch.float).squeeze())
+                    else:
+                        err = self.loss(batch_preds, base_labels_batch.to(torch.long))
+
+                    if is_iit:
+                        sources_batch, iit_labels_batch, intervention_ids_batch \
+                            = self.process_IIT_batch(batch)
+                        batch_iit_preds = self.model.iit_forward(
+                            base_batch,
+                            sources_batch,
+                            intervention_ids_batch,
+                            intervention_ids_to_coords
+                        )
+                        # NOTE: Converting int to long for CE, adding MSE loss case
+                        if self.n_classes is None:
+                            base_preds = batch_preds.diag()
+                            iit_preds = batch_iit_preds.diag()
+                            preds = torch.stack((base_preds, iit_preds)).t()
+                            err = self.loss(preds, iit_labels_batch.to(torch.long))
+                        elif self.n_classes == 1:
+                            err += self.loss(batch_iit_preds.squeeze(), iit_labels_batch.to(torch.float).squeeze())
+                        else:
+                            err += self.loss(batch_iit_preds, iit_labels_batch.to(torch.long))
+
+                    score += err.item()
+                    pbar.set_postfix({'loss': err.item(), 'epoch_loss': score})
+
+        self.model.train()
+
+        score = score / len(dataloader)
+
+        if use_wandb:
+            wandb.log({"eval_loss": score})
+
         self.validation_scores.append(score)
-        # If the score isn't at least `self.tol` better, increment:
-        if score < (self.best_score + self.tol):
+
+        if score > (self.best_score - self.tol):
             self.no_improvement_count += 1
         else:
             self.no_improvement_count = 0
-        # If the current score is numerically better than all previous
-        # scores, update the best parameters:
-        if score > self.best_score:
-            self.best_parameters = copy.deepcopy(self.model.state_dict())
+
+        if score < self.best_score:
             self.best_score = score
-        self.model.train()
+            self.best_parameters = self.model.state_dict()
 
     def _update_no_improvement_count_errors(self, epoch_error):
         """
@@ -678,7 +962,7 @@ class LIMTrainer:
         # (no need to take argmax)
         if self.n_classes == 1:
             return preds.squeeze()
-        
+
         if self.class2index is not None:
             preds = preds.argmax(axis=1)
             preds = np.array(preds)
@@ -686,7 +970,7 @@ class LIMTrainer:
             preds = torch.tensor(preds)
         else:
             preds = preds.argmax(axis=1)
-            
+
         return preds
 
     def iit_predict(self,
@@ -728,7 +1012,7 @@ class LIMTrainer:
         sources = [source.to(device) for source in sources]
 
         intervention_ids = intervention_ids.float().to(device)
-        
+
         if self.class2index is None:
             base_labels = [ 0 for _ in range(base.shape[0])]
             iit_labels = [ 0 for _ in range(base.shape[0])]
@@ -782,9 +1066,8 @@ class LIMTrainer:
             preds = torch.tensor(preds)
         else:
             preds = preds.argmax(axis=1)
-            
-        return preds
 
+        return preds
 
     def get_params(self, deep=True):
         params = self.params.copy()
@@ -863,7 +1146,7 @@ class LIMTrainer:
         param_str = ",\n\t".join(param_str)
         return "{}(\n\t{})".format(self.__class__.__name__, param_str)
 
-    
+
 class BERTLIMTrainer(LIMTrainer):
     def __init__(self, bert, **kwargs):
         super().__init__(bert, **kwargs)
@@ -979,7 +1262,7 @@ class BERTLIMTrainer(LIMTrainer):
             return preds.squeeze()
 
         return preds.argmax(axis=1)
-    
+
     def predict_with_intervention(self, X_base, gets, intervention, variable=0, device=None):
         """
         Internal method that subclasses are expected to use to define
@@ -1175,7 +1458,7 @@ class CLIPLIMTrainer(LIMTrainer):
             torch.stack(sources_mask, dim=1),
             (-1, len(sources),
             base_input.shape[-1]))
-        
+
         sources_image_embeds = torch.reshape(
             torch.stack(sources_image_embeds, dim=1),
             (-1, len(sources),
@@ -1263,7 +1546,7 @@ class CLIPLIMTrainer(LIMTrainer):
             return preds.squeeze()
 
         return preds.argmax(axis=1)
-    
+
     def predict_with_intervention(self, X_base, gets, intervention, variable=0, device=None):
         """
         Internal method that subclasses are expected to use to define
@@ -1400,7 +1683,7 @@ class CLIPLIMTrainer(LIMTrainer):
                     intervention_ids_batch,
                     intervention_ids_to_coords
                 )
-                
+
                 # FOR CLIP ONLY: we are only concerned with diagonal entries (right image to right description)
                 batch_iit_preds = batch_iit_preds.diag()
                 if preds is None:
@@ -1419,5 +1702,3 @@ class CLIPLIMTrainer(LIMTrainer):
             return preds.squeeze()
 
         return preds.argmax(axis=1)
-
-

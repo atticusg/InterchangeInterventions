@@ -77,6 +77,7 @@ class SequentialLayers(torch.nn.Module):
                         torch.arange(output.size(0)), eot_indices, st:en
                     ]
                     args = layer(target)
+                    hidden_state = args
             elif isinstance(layer, InverseLinearLayer):
                 intervention = layer(args)
                 reps = torch.stack([
@@ -95,6 +96,11 @@ class SequentialLayers(torch.nn.Module):
                 args = (reps, *rest)
             else:
                 args = layer(*args)
+
+        if output_hidden_states:
+            # args contains (last_hidden_state, opt. encoder_states, opt. attentions)
+            return args[0], hidden_state
+
         return args
     
     ############## NOTE: is the function below for when we are intervening on multiple variables?? ###################
@@ -228,6 +234,27 @@ class LIMClipEncoderLayer(torch.nn.Module):
             output_hidden_states,
             return_dict
         )
+    
+class LIMClipClassificationHead(torch.nn.Module):
+    """
+    Head for sentence-level classification tasks used in multi-task objective. 
+    Adapted from RoBERTa classification head.
+    """
+
+    def __init__(self, hidden_size, num_labels, dropout):
+        super().__init__()
+        self.dense = torch.nn.Linear(hidden_size, hidden_size)
+        classifier_dropout = dropout
+        self.dropout = torch.nn.Dropout(classifier_dropout)
+        self.out_proj = torch.nn.Linear(hidden_size, num_labels)
+
+    def forward(self, x):
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
 
 
 class LIMClipTextModel(LayeredIntervenableModel):
@@ -243,7 +270,8 @@ class LIMClipTextModel(LayeredIntervenableModel):
         static_search=False,
         nested_disentangle_inplace=False,
         # set to True in order to learn intervention vector
-        learn_intervention_vector=False 
+        learn_intervention_vector=False,
+        intervention_site_size=None
     ):
         super().__init__(
             debug=debug,
@@ -253,7 +281,7 @@ class LIMClipTextModel(LayeredIntervenableModel):
             device=device
         )
 
-        self.n_classes = None  # marker for CLIP loss (ver scrappy code here...)
+        self.n_classes = None  # marker for CLIP loss (very scrappy code here...)
         
         self.combiner = SequentialLayers
         self.num_layers = len(clip.text_model.encoder.layers)
@@ -278,6 +306,17 @@ class LIMClipTextModel(LayeredIntervenableModel):
         self.learn_intervention_vector = learn_intervention_vector
         if self.learn_intervention_vector:
             self.intervention_vector = torch.nn.Parameter(torch.randn(self.model_dim))
+            
+        # self.multitask_objective = False
+        # if intervention_site_size is not None:
+        #     self.multitask_objective = True
+        #     self.multitask_layer = LIMClipClassificationHead(
+        #         intervention_site_size, 
+        #         2, 
+        #         clip.config.text_config.dropout
+        #     )
+        # # used to store multitask output, if using multitask_layer (see retrieval wrapper)
+        # self.multitask_output = None
         
         self.build_graph(self.model_layers, self.model_dim, static_search, nested_disentangle_inplace)
 
@@ -353,7 +392,7 @@ class LIMClipTextModel(LayeredIntervenableModel):
         text_embeds = self.text_projection(pooled_output)
         return text_embeds
 
-    def forward(self, inputs):
+    def forward(self, inputs, output_hidden_states=False):
         """
         Computes a forward pass with input `X`.
         
@@ -381,20 +420,23 @@ class LIMClipTextModel(LayeredIntervenableModel):
             attention_mask = _expand_mask(attention_mask, hidden_states.dtype)
 
         if self.analysis:
-            last_hidden_state = self.analysis_model(
+            outputs = self.analysis_model(
                 hidden_states,
                 eot_indices=eot_indices,
                 attention_mask=attention_mask, 
-                causal_attention_mask=causal_attention_mask
-            )[0]
+                causal_attention_mask=causal_attention_mask,
+                output_hidden_states=output_hidden_states
+            )
         else:
-            last_hidden_state = self.normal_model(
+            outputs = self.normal_model(
                 hidden_states, 
                 eot_indices=eot_indices,
                 attention_mask=attention_mask, 
-                causal_attention_mask=causal_attention_mask
-            )[0]
+                causal_attention_mask=causal_attention_mask,
+                output_hidden_states=output_hidden_states
+            )
 
+        last_hidden_state = outputs[0]
         last_hidden_state = self.final_layer_norm(last_hidden_state)
 
         # text_embeds.shape = [batch_size, sequence_length, transformer.width]
@@ -413,6 +455,9 @@ class LIMClipTextModel(LayeredIntervenableModel):
         # cosine similarity as logits
         logit_scale = self.logit_scale.exp()
         logits_per_text = torch.matmul(text_embeds, image_embeds.squeeze(1).t()) * logit_scale
+
+        if output_hidden_states:
+            return logits_per_text, outputs[1]
 
         return logits_per_text
 
@@ -480,6 +525,10 @@ class LIMClipTextModel(LayeredIntervenableModel):
         counterfactual_logits = self.forward((base_input, base_mask, base_image_embeds))
         for handler in handlers:
             handler.remove()
+            
+        # if multitask objective, return multitask output from retreival wrapper
+        # if self.multitask_objective:
+        #     return counterfactual_logits, self.multitask_output
         return counterfactual_logits
 
     def intervention_wrapper(self, output, set):
@@ -521,4 +570,6 @@ class LIMClipTextModel(LayeredIntervenableModel):
             reps = output[0][
                 torch.arange(output[0].size(0)), eot_indices, get["start"]: get["end"]
             ]
+        # if self.multitask_objective:
+        #     self.multitask_output = self.multitask_layer(reps)
         return reps
